@@ -1,0 +1,8 @@
+name: LoveTrades
+version: '${version}'
+
+main: me.lovelace.loveTrades.LoveTrades
+api-version: '1.21.11'
+load: POSTWORLD
+
+authors: [ Lovelace ]
