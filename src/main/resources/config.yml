@@ -1,0 +1,57 @@
+settings:
+  # Время ожидания запроса на торговлю (в секундах)
+  request-timeout: 30
+  # Длительность финального отсчёта (в секундах)
+  countdown-duration: 3
+
+# Интеграция с клановым плагином.
+# enabled: включить проверку клановых отношений при торговле.
+# ally-bonus: модификатор налога для союзников (отрицательное = бонус к ресурсам обоим игрокам).
+#   Пример: -10.0 означает, что оба игрока получают на 10% больше предметов/XP при торговле.
+# enemy-block: запрещать торговлю между игроками из враждебных кланов.
+clan:
+  enabled: false
+  ally-bonus: -10.0
+  enemy-block: true
+
+# Модификаторы налогов по группам прав.
+# Игроку нужен перм axtrades.modifier.<name> для применения группы.
+# tax: положительное — налог (получатель получает меньше)
+#      отрицательное — бонус (получатель получает больше; применяется к предметам и XP)
+# Индивидуальные модификаторы игроков хранятся в data/players.yml и суммируются с групповым.
+modifiers:
+  groups:
+    vip:
+      permission: "axtrades.modifier.vip"
+      tax: -10.0
+    donor:
+      permission: "axtrades.modifier.donor"
+      tax: 15.0
+    newcomer:
+      permission: "axtrades.modifier.newcomer"
+      tax: 25.0
+
+messages:
+  request-sent: "&aЗапрос на торговлю отправлен &e{player}&a."
+  request-received: "&e{player} &aхочет начать торговлю с вами."
+  request-expired: "&cЗапрос на торговлю от &e{player} &cистёк."
+  request-expired-sender: "&cИгрок &e{player} &cне ответил на запрос торговли."
+  trade-cancelled-damage: "&cТорговля отменена, так как один из участников получил урон!"
+  trade-cancelled-disconnect: "&cТорговля отменена: партнёр вышел из игры."
+  trade-cancelled-player: "&cТорговля отменена."
+  trade-complete: "&aТорговля успешно завершена!"
+  already-trading: "&cЭтот игрок уже участвует в торговле."
+  already-trading-self: "&cВы уже участвуете в торговле."
+  pending-request: "&cУ этого игрока уже есть ожидающий запрос на торговлю."
+  cannot-self: "&cНельзя торговать с самим собой."
+  player-offline: "&cИгрок &e{player} &cне в сети."
+  player-not-found: "&cИгрок &e{player} &cне найден."
+  no-permission: "&cУ вас нет прав для этого действия."
+  no-pending-request: "&cНет запроса на торговлю от &e{player}&c."
+  xp-enter-amount: "&eВведите количество уровней опыта для передачи (0 — убрать):"
+  xp-set: "&aУстановлено &e{amount} &aур. опыта для передачи."
+  xp-invalid: "&cВведите целое число, не меньше 0."
+  xp-not-enough: "&cУ вас недостаточно уровней опыта. Доступно: &e{available}&c."
+  inventory-full: "&cВаш инвентарь заполнен — предметы выброшены рядом с вами."
+  clan-enemy-blocked: "&cВы не можете торговать с игроком из враждебного клана!"
+  clan-ally-bonus: "&6⚔ Союзники! Оба игрока получают &e+10%% &6к ресурсам."
