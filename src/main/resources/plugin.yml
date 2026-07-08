@@ -6,3 +6,27 @@ api-version: '1.21.11'
 load: POSTWORLD
 
 authors: [ Lovelace ]
+
+softdepend: [ LuckPerms ]
+
+commands:
+  trade:
+    description: "Начать торговлю с другим игроком"
+    aliases: [ торговля ]
+    usage: "/trade <игрок>"
+    permission: axtrades.use
+  tradeadmin:
+    description: "Административные команды торговли"
+    usage: "/tradeadmin <modifier|reload>"
+    permission: axtrades.admin
+
+permissions:
+  axtrades.use:
+    description: "Разрешает использование команды /trade"
+    default: true
+  axtrades.bypass.tax:
+    description: "Полный обход любых комиссий и налогов"
+    default: false
+  axtrades.admin:
+    description: "Административные команды торговли"
+    default: op

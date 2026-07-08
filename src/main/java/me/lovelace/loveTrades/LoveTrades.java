@@ -1,16 +1,52 @@
 package me.lovelace.loveTrades;
 
+import me.lovelace.loveTrades.command.TradeAdminCommand;
+import me.lovelace.loveTrades.command.TradeCommand;
+import me.lovelace.loveTrades.listener.PlayerProtectionListener;
+import me.lovelace.loveTrades.listener.TradeInventoryListener;
+import me.lovelace.loveTrades.listener.XpInputListener;
+import me.lovelace.loveTrades.manager.ConfigManager;
+import me.lovelace.loveTrades.manager.ModifierManager;
+import me.lovelace.loveTrades.manager.TradeManager;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class LoveTrades extends JavaPlugin {
 
+    private ConfigManager configManager;
+    private ModifierManager modifierManager;
+    private TradeManager tradeManager;
+
     @Override
     public void onEnable() {
-        // Plugin startup logic
+        configManager   = new ConfigManager(this);
+        modifierManager = new ModifierManager(this, configManager);
+        tradeManager    = new TradeManager(this, configManager, modifierManager);
+
+        TradeCommand      tradeCmd      = new TradeCommand(tradeManager, configManager);
+        TradeAdminCommand tradeAdminCmd = new TradeAdminCommand(modifierManager, configManager);
+
+        getCommand("trade").setExecutor(tradeCmd);
+        getCommand("trade").setTabCompleter(tradeCmd);
+        getCommand("tradeadmin").setExecutor(tradeAdminCmd);
+        getCommand("tradeadmin").setTabCompleter(tradeAdminCmd);
+
+        PluginManager pm = getServer().getPluginManager();
+        pm.registerEvents(new TradeInventoryListener(tradeManager, this), this);
+        pm.registerEvents(new PlayerProtectionListener(tradeManager), this);
+        pm.registerEvents(new XpInputListener(tradeManager, this), this);
+
+        getLogger().info("LoveTrades включён.");
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
+        if (tradeManager != null) tradeManager.onDisable();
+        if (modifierManager != null) modifierManager.savePlayersData();
+        getLogger().info("LoveTrades выключён.");
     }
+
+    public ConfigManager getConfigManager()     { return configManager; }
+    public ModifierManager getModifierManager() { return modifierManager; }
+    public TradeManager getTradeManager()       { return tradeManager; }
 }
