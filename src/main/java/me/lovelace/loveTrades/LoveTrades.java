@@ -1,5 +1,6 @@
 package me.lovelace.loveTrades;
 
+import me.lovelace.loveTrades.api.ClanIntegration;
 import me.lovelace.loveTrades.command.TradeAdminCommand;
 import me.lovelace.loveTrades.command.TradeCommand;
 import me.lovelace.loveTrades.listener.PlayerProtectionListener;
@@ -16,6 +17,7 @@ public final class LoveTrades extends JavaPlugin {
     private ConfigManager configManager;
     private ModifierManager modifierManager;
     private TradeManager tradeManager;
+    private ClanIntegration clanIntegration;
 
     @Override
     public void onEnable() {
@@ -45,6 +47,20 @@ public final class LoveTrades extends JavaPlugin {
         if (modifierManager != null) modifierManager.savePlayersData();
         getLogger().info("LoveTrades выключён.");
     }
+
+    /**
+     * Register a clan integration so LoveTrades can check relationships.
+     * Call this from your clan plugin's onEnable:
+     *
+     *   Plugin lt = Bukkit.getPluginManager().getPlugin("LoveTrades");
+     *   if (lt instanceof LoveTrades love) love.setClanIntegration(new YourIntegration());
+     */
+    public void setClanIntegration(ClanIntegration integration) {
+        this.clanIntegration = integration;
+        getLogger().info("Клановая интеграция подключена: " + integration.getClass().getSimpleName());
+    }
+
+    public ClanIntegration getClanIntegration() { return clanIntegration; }
 
     public ConfigManager getConfigManager()     { return configManager; }
     public ModifierManager getModifierManager() { return modifierManager; }

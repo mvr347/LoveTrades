@@ -30,6 +30,10 @@ public class ConfigManager {
         return msg;
     }
 
+    public boolean isClanEnabled()    { return plugin.getConfig().getBoolean("clan.enabled",     false); }
+    public double  getClanAllyBonus() { return plugin.getConfig().getDouble("clan.ally-bonus",  -10.0); }
+    public boolean isClanEnemyBlock() { return plugin.getConfig().getBoolean("clan.enemy-block", true); }
+
     public FileConfiguration getRaw() {
         return plugin.getConfig();
     }

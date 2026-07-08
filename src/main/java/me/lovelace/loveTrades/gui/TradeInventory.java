@@ -118,7 +118,7 @@ public final class TradeInventory {
         int slot = isLeft ? LEFT_XP_SLOT : RIGHT_XP_SLOT;
         ItemStack item = new ItemStack(Material.EXPERIENCE_BOTTLE);
         ItemMeta  meta = item.getItemMeta();
-        meta.displayName(Component.text("✦ Опыт: " + amount + " XP", NamedTextColor.YELLOW)
+        meta.displayName(Component.text("✦ Опыт: " + amount + " ур.", NamedTextColor.YELLOW)
             .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("Нажмите, чтобы изменить", NamedTextColor.GRAY)
@@ -136,22 +136,22 @@ public final class TradeInventory {
         int leftCount  = countItems(inv, LEFT_ITEM_SLOTS);
         int rightCount = countItems(inv, RIGHT_ITEM_SLOTS);
 
-        ItemStack leftInfo = makeInfoBook(
-            legacy("&6&lВаше предложение"),
-            List.of(
-                legacy("&7Предметов: &f" + leftCount + " ед."),
-                legacy("&7Опыт: &f" + session.getXpLeft() + " XP"),
-                legacy("&7Налог получателя: &c" + String.format("%.1f%%", Math.max(0, rightTax)))
-            ));
+        List<Component> leftLore = new ArrayList<>();
+        leftLore.add(legacy("&7Предметов: &f" + leftCount + " ед."));
+        leftLore.add(legacy("&7Опыт: &f" + session.getXpLeft() + " ур."));
+        leftLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", Math.max(0, rightTax))));
+        if (session.isAllyBonus()) leftLore.add(legacy("&6⚔ Союз: &a-10%% к налогу"));
+
+        ItemStack leftInfo = makeInfoBook(legacy("&6&lВаше предложение"), leftLore);
         for (int s : LEFT_INFO_SLOTS) inv.setItem(s, leftInfo);
 
-        ItemStack rightInfo = makeInfoBook(
-            legacy("&6&lПредложение партнёра"),
-            List.of(
-                legacy("&7Предметов: &f" + rightCount + " ед."),
-                legacy("&7Опыт: &f" + session.getXpRight() + " XP"),
-                legacy("&7Налог получателя: &c" + String.format("%.1f%%", Math.max(0, leftTax)))
-            ));
+        List<Component> rightLore = new ArrayList<>();
+        rightLore.add(legacy("&7Предметов: &f" + rightCount + " ед."));
+        rightLore.add(legacy("&7Опыт: &f" + session.getXpRight() + " ур."));
+        rightLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", Math.max(0, leftTax))));
+        if (session.isAllyBonus()) rightLore.add(legacy("&6⚔ Союз: &a-10%% к налогу"));
+
+        ItemStack rightInfo = makeInfoBook(legacy("&6&lПредложение партнёра"), rightLore);
         for (int s : RIGHT_INFO_SLOTS) inv.setItem(s, rightInfo);
     }
 

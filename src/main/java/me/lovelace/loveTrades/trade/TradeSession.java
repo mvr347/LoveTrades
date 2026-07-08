@@ -18,6 +18,8 @@ public class TradeSession {
     private TradeState state = TradeState.ACTIVE;
     private BukkitTask countdownTask;
     private int countdownRemaining;
+    // Set to true when both players belong to allied clans at trade start
+    private boolean allyBonus = false;
 
     public TradeSession(UUID playerLeft, UUID playerRight, Inventory inventory) {
         this.playerLeft = playerLeft;
@@ -67,4 +69,7 @@ public class TradeSession {
 
     public int getCountdownRemaining() { return countdownRemaining; }
     public void setCountdownRemaining(int remaining) { this.countdownRemaining = remaining; }
+
+    public boolean isAllyBonus() { return allyBonus; }
+    public void setAllyBonus(boolean allyBonus) { this.allyBonus = allyBonus; }
 }

@@ -55,14 +55,19 @@ public class ModifierManager {
 
     /**
      * Effective tax applied to items/XP received by this player.
-     * = group tax (from first matching permission in config) + individual player tax.
-     * Returns 0 if axtrades.bypass.tax is set.
+     * = group tax + individual tax + extraModifier (pass ally bonus here as a negative value).
+     * Returns 0 if axtrades.bypass.tax is set (extraModifier is also suppressed in that case).
      */
-    public double getEffectiveTax(Player receiver) {
+    public double getEffectiveTax(Player receiver, double extraModifier) {
         if (receiver.hasPermission("axtrades.bypass.tax")) return 0.0;
-        double groupTax = resolveGroupTax(receiver);
+        double groupTax  = resolveGroupTax(receiver);
         double playerTax = playerTaxCache.getOrDefault(receiver.getUniqueId(), 0.0);
-        return groupTax + playerTax;
+        return groupTax + playerTax + extraModifier;
+    }
+
+    /** Convenience overload with no extra modifier. */
+    public double getEffectiveTax(Player receiver) {
+        return getEffectiveTax(receiver, 0.0);
     }
 
     private double resolveGroupTax(Player player) {
@@ -93,13 +98,21 @@ public class ModifierManager {
         savePlayersData();
     }
 
-    /** Applies tax to a stackable item amount. Clamps effective rate to [0, 100]. */
+    /**
+     * Applies tax to a stackable item amount.
+     * Positive tax reduces the amount (items burned). Negative tax creates a bonus
+     * (e.g. -10 means receiver gets 10% extra items). Cap: max 100% tax (0 items),
+     * no cap on the negative (bonus) side.
+     */
     public int applyItemTax(int amount, double effectiveTax) {
-        double rate = Math.max(0.0, Math.min(100.0, effectiveTax));
-        return (int) Math.floor(amount * (1.0 - rate / 100.0));
+        double rate = Math.min(100.0, effectiveTax); // allow negative (bonus), cap at 100
+        return Math.max(0, (int) Math.floor(amount * (1.0 - rate / 100.0)));
     }
 
-    /** Applies tax to XP. Negative tax (bonus) can increase XP; result is clamped at 0. */
+    /**
+     * Applies tax to XP levels.
+     * Negative tax (bonus) can increase XP; result is clamped at 0.
+     */
     public int applyXpTax(int amount, double effectiveTax) {
         return Math.max(0, (int) Math.floor(amount * (1.0 - effectiveTax / 100.0)));
     }

@@ -1,6 +1,7 @@
 package me.lovelace.loveTrades.manager;
 
 import me.lovelace.loveTrades.LoveTrades;
+import me.lovelace.loveTrades.api.ClanIntegration;
 import me.lovelace.loveTrades.api.events.*;
 import me.lovelace.loveTrades.gui.TradeInventory;
 import me.lovelace.loveTrades.gui.XpInputSession;
@@ -26,9 +27,9 @@ public class TradeManager {
     private final ConfigManager config;
     private final ModifierManager modifiers;
 
-    private final Map<UUID, TradeSession>  activeSessions   = new HashMap<>();
-    private final Map<UUID, TradeRequest>  pendingRequests  = new HashMap<>();
-    private final Map<UUID, XpInputSession> xpInputSessions = new HashMap<>();
+    private final Map<UUID, TradeSession>   activeSessions    = new HashMap<>();
+    private final Map<UUID, TradeRequest>   pendingRequests   = new HashMap<>();
+    private final Map<UUID, XpInputSession> xpInputSessions   = new HashMap<>();
 
     // UUIDs whose next InventoryCloseEvent should be ignored (programmatic close)
     private final Set<UUID> programmaticCloseSet = new HashSet<>();
@@ -41,15 +42,24 @@ public class TradeManager {
 
     // ── Queries ────────────────────────────────────────────────────────────────
 
-    public boolean isInSession(UUID uuid)       { return activeSessions.containsKey(uuid); }
-    public boolean hasPendingRequest(UUID uuid) { return pendingRequests.containsKey(uuid); }
-    public TradeSession getSession(UUID uuid)   { return activeSessions.get(uuid); }
-    public XpInputSession getXpInput(UUID uuid) { return xpInputSessions.get(uuid); }
+    public boolean isInSession(UUID uuid)         { return activeSessions.containsKey(uuid); }
+    public boolean hasPendingRequest(UUID uuid)   { return pendingRequests.containsKey(uuid); }
+    public TradeSession getSession(UUID uuid)     { return activeSessions.get(uuid); }
+    public XpInputSession getXpInput(UUID uuid)   { return xpInputSessions.get(uuid); }
     public boolean isProgrammaticClose(UUID uuid) { return programmaticCloseSet.remove(uuid); }
 
     // ── Request flow ───────────────────────────────────────────────────────────
 
     public void sendRequest(Player sender, Player target) {
+        // Clan enemy check
+        if (config.isClanEnabled() && config.isClanEnemyBlock()) {
+            ClanIntegration clan = plugin.getClanIntegration();
+            if (clan != null && clan.isEnemy(sender, target)) {
+                sender.sendMessage(msg("clan-enemy-blocked", "", ""));
+                return;
+            }
+        }
+
         TradeRequestEvent event = new TradeRequestEvent(sender, target);
         Bukkit.getPluginManager().callEvent(event);
         if (event.isCancelled()) return;
@@ -69,7 +79,8 @@ public class TradeManager {
 
         sender.sendMessage(msg("request-sent", "{player}", target.getName()));
 
-        Component clickable = Component.text(target.getName() + " хочет начать торговлю с вами. ", NamedTextColor.YELLOW)
+        // Fix: show sender's name in the target's notification
+        Component clickable = Component.text(sender.getName() + " хочет начать торговлю с вами. ", NamedTextColor.YELLOW)
             .append(Component.text("[Принять]", NamedTextColor.GREEN).decorate(TextDecoration.BOLD)
                 .clickEvent(ClickEvent.runCommand("/trade accept " + sender.getName())))
             .append(Component.text(" "))
@@ -126,6 +137,16 @@ public class TradeManager {
     private void startTrade(Player left, Player right) {
         Inventory inv = TradeInventory.createInventory(left, right);
         TradeSession session = new TradeSession(left.getUniqueId(), right.getUniqueId(), inv);
+
+        // Determine clan ally bonus at session start
+        if (config.isClanEnabled()) {
+            ClanIntegration clan = plugin.getClanIntegration();
+            if (clan != null && clan.isAlly(left, right)) {
+                session.setAllyBonus(true);
+                left.sendMessage(msg("clan-ally-bonus", "", ""));
+                right.sendMessage(msg("clan-ally-bonus", "", ""));
+            }
+        }
 
         activeSessions.put(left.getUniqueId(),  session);
         activeSessions.put(right.getUniqueId(), session);
@@ -211,14 +232,18 @@ public class TradeManager {
         List<ItemStack> leftOffer  = collectSlots(inv, TradeInventory.LEFT_ITEM_SLOTS);
         List<ItemStack> rightOffer = collectSlots(inv, TradeInventory.RIGHT_ITEM_SLOTS);
 
-        double leftTax  = modifiers.getEffectiveTax(left);
-        double rightTax = modifiers.getEffectiveTax(right);
+        // Clan ally bonus modifier (negative = discount for both receivers)
+        double allyMod = session.isAllyBonus() ? config.getClanAllyBonus() : 0.0;
 
-        // leftOffer goes to right player (taxed by rightTax)
-        // rightOffer goes to left player (taxed by leftTax)
+        // leftOffer goes to right (taxed by right's effective tax + ally mod)
+        // rightOffer goes to left (taxed by left's effective tax + ally mod)
+        double leftTax  = modifiers.getEffectiveTax(left,  allyMod);
+        double rightTax = modifiers.getEffectiveTax(right, allyMod);
+
         List<ItemStack> itemsForRight = applyItemTax(leftOffer,  rightTax);
         List<ItemStack> itemsForLeft  = applyItemTax(rightOffer, leftTax);
 
+        // XP levels: left offers xpLeft to right, right offers xpRight to left
         int xpForRight = modifiers.applyXpTax(session.getXpLeft(),  rightTax);
         int xpForLeft  = modifiers.applyXpTax(session.getXpRight(), leftTax);
 
@@ -231,18 +256,16 @@ public class TradeManager {
             return;
         }
 
-        // Close both GUIs before transferring
         closeInventoriesProgrammatically(session, left, right);
 
-        // Transfer items
         giveItems(left,  preEvent.getItemsForLeft());
         giveItems(right, preEvent.getItemsForRight());
 
-        // Deduct XP from givers, give to receivers
-        deductXp(left,  session.getXpLeft());
-        deductXp(right, session.getXpRight());
-        left.giveExp(preEvent.getXpForLeft());
-        right.giveExp(preEvent.getXpForRight());
+        // XP is stored and transferred in levels
+        deductXpLevels(left,  session.getXpLeft());
+        deductXpLevels(right, session.getXpRight());
+        left.giveExpLevels(preEvent.getXpForLeft());
+        right.giveExpLevels(preEvent.getXpForRight());
 
         removeSession(session);
 
@@ -266,7 +289,6 @@ public class TradeManager {
 
         closeInventoriesProgrammatically(session, left, right);
 
-        // Return items to their owners on the main thread
         List<ItemStack> leftItems  = collectSlots(session.getInventory(), TradeInventory.LEFT_ITEM_SLOTS);
         List<ItemStack> rightItems = collectSlots(session.getInventory(), TradeInventory.RIGHT_ITEM_SLOTS);
 
@@ -313,10 +335,11 @@ public class TradeManager {
             if (amount < 0) throw new NumberFormatException();
         } catch (NumberFormatException e) {
             player.sendMessage(msg("xp-invalid", "", ""));
-            return; // keep session open for retry
+            return;
         }
 
-        int available = player.getTotalExperience();
+        // XP amounts are in levels
+        int available = player.getLevel();
         if (amount > available) {
             player.sendMessage(msg("xp-not-enough", "{available}", String.valueOf(available)));
             return;
@@ -328,7 +351,7 @@ public class TradeManager {
         if (isLeft) session.setXpLeft(amount);
         else        session.setXpRight(amount);
 
-        // Reset other player's ready state
+        // Reset other player's ready state since the offer changed
         boolean otherWasReady = session.isReadyOf(!isLeft);
         if (otherWasReady) {
             session.setReady(!isLeft, false);
@@ -348,7 +371,7 @@ public class TradeManager {
         xpInputSessions.remove(uuid);
     }
 
-    // ── Item change handler (called after uncancelled clicks in own slots) ────
+    // ── Item change handler ────────────────────────────────────────────────────
 
     public void handleItemChange(TradeSession session, boolean changerIsLeft) {
         boolean otherReady = session.isReadyOf(!changerIsLeft);
@@ -377,7 +400,6 @@ public class TradeManager {
     }
 
     public void onDisable() {
-        // Snapshot to avoid ConcurrentModification
         for (TradeSession session : new HashSet<>(activeSessions.values())) {
             cancelTrade(session, TradeCancelEvent.Reason.PLUGIN_DISABLED);
         }
@@ -414,7 +436,8 @@ public class TradeManager {
     private List<ItemStack> applyItemTax(List<ItemStack> items, double effectiveTax) {
         List<ItemStack> result = new ArrayList<>();
         for (ItemStack item : items) {
-            if (item.getMaxStackSize() == 1 || effectiveTax <= 0) {
+            if (item.getMaxStackSize() == 1) {
+                // Unstackable items (weapons, armour, tools, etc.) always transfer 1:1
                 result.add(item.clone());
             } else {
                 int newAmount = modifiers.applyItemTax(item.getAmount(), effectiveTax);
@@ -423,7 +446,6 @@ public class TradeManager {
                     copy.setAmount(newAmount);
                     result.add(copy);
                 }
-                // Destroyed items are simply not added — removed from economy
             }
         }
         return result;
@@ -448,14 +470,12 @@ public class TradeManager {
         if (player != null && player.isOnline()) {
             giveItems(player, items);
         }
-        // If offline: items are lost in the base implementation.
-        // An offline-player storage extension could be added here.
     }
 
-    private void deductXp(Player player, int amount) {
-        if (amount <= 0) return;
-        int newTotal = Math.max(0, player.getTotalExperience() - amount);
-        player.setTotalExperience(newTotal);
+    /** Deduct XP levels from player, clamped at 0. */
+    private void deductXpLevels(Player player, int levels) {
+        if (levels <= 0) return;
+        player.setLevel(Math.max(0, player.getLevel() - levels));
     }
 
     private Component msg(String key, String placeholder, String value) {
