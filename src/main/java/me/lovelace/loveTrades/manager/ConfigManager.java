@@ -24,6 +24,10 @@ public class ConfigManager {
         return plugin.getConfig().getInt("settings.countdown-duration", 3);
     }
 
+    public int getInactivityTimeoutSeconds() {
+        return plugin.getConfig().getInt("settings.inactivity-timeout-seconds", 120);
+    }
+
     public String getMessage(String key) {
         String msg = plugin.getConfig().getString("messages." + key, "");
         if (msg.isEmpty()) plugin.getLogger().warning("Missing message key: " + key);
