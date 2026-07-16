@@ -34,10 +34,17 @@ public class TradeManager {
     // UUIDs whose next InventoryCloseEvent should be ignored (programmatic close)
     private final Set<UUID> programmaticCloseSet = new HashSet<>();
 
+    // Set while the plugin is being disabled so item returns happen synchronously
+    private boolean disabling = false;
+
+    private BukkitTask inactivityCheckTask;
+
     public TradeManager(LoveTrades plugin, ConfigManager config, ModifierManager modifiers) {
         this.plugin    = plugin;
         this.config    = config;
         this.modifiers = modifiers;
+
+        this.inactivityCheckTask = Bukkit.getScheduler().runTaskTimer(plugin, this::checkInactiveSessions, 20L, 20L);
     }
 
     // ── Queries ────────────────────────────────────────────────────────────────
@@ -162,6 +169,7 @@ public class TradeManager {
     public void toggleReady(TradeSession session, boolean isLeft, Player player) {
         if (session.getState() != TradeState.ACTIVE) return;
 
+        session.touch();
         boolean nowReady = !session.isReadyOf(isLeft);
         session.setReady(isLeft, nowReady);
         TradeInventory.updateStatusSlot(session.getInventory(), isLeft, nowReady);
@@ -206,6 +214,7 @@ public class TradeManager {
         session.setState(TradeState.ACTIVE);
         session.setReady(true,  false);
         session.setReady(false, false);
+        session.touch();
 
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
@@ -224,6 +233,15 @@ public class TradeManager {
 
         if (left == null || !left.isOnline() || right == null || !right.isOnline()) {
             cancelTrade(session, TradeCancelEvent.Reason.DISCONNECT);
+            return;
+        }
+
+        // Re-validate committed XP right before transferring it: a player may have spent
+        // levels (enchanting, anvil, etc.) after committing them to the trade but before
+        // the countdown finished. Transferring the originally-committed amount in that
+        // case would create XP out of nothing, so bail out instead.
+        if (left.getLevel() < session.getXpLeft() || right.getLevel() < session.getXpRight()) {
+            cancelTrade(session, TradeCancelEvent.Reason.INSUFFICIENT_XP);
             return;
         }
 
@@ -292,10 +310,18 @@ public class TradeManager {
         List<ItemStack> leftItems  = collectSlots(session.getInventory(), TradeInventory.LEFT_ITEM_SLOTS);
         List<ItemStack> rightItems = collectSlots(session.getInventory(), TradeInventory.RIGHT_ITEM_SLOTS);
 
-        Bukkit.getScheduler().runTask(plugin, () -> {
+        // While the plugin is disabling, a scheduled task is not guaranteed to run at all,
+        // which would silently destroy the items sitting in the trade. Return them directly
+        // in that case instead of going through the scheduler.
+        if (disabling || !plugin.isEnabled()) {
             returnItems(session.getPlayerLeft(),  leftItems,  left);
             returnItems(session.getPlayerRight(), rightItems, right);
-        });
+        } else {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                returnItems(session.getPlayerLeft(),  leftItems,  left);
+                returnItems(session.getPlayerRight(), rightItems, right);
+            });
+        }
 
         removeSession(session);
         sendCancelMessages(left, right, reason);
@@ -304,12 +330,30 @@ public class TradeManager {
 
     private void sendCancelMessages(Player left, Player right, TradeCancelEvent.Reason reason) {
         String key = switch (reason) {
-            case DAMAGE     -> "trade-cancelled-damage";
-            case DISCONNECT -> "trade-cancelled-disconnect";
-            default         -> "trade-cancelled-player";
+            case DAMAGE             -> "trade-cancelled-damage";
+            case DISCONNECT         -> "trade-cancelled-disconnect";
+            case INSUFFICIENT_XP    -> "trade-cancelled-insufficient-xp";
+            case INACTIVITY         -> "trade-cancelled-inactivity";
+            default                 -> "trade-cancelled-player";
         };
         if (left  != null) left.sendMessage(msg(key, "", ""));
         if (right != null) right.sendMessage(msg(key, "", ""));
+    }
+
+    /** Periodic check that cancels ACTIVE trades that have had no activity within the configured timeout. */
+    private void checkInactiveSessions() {
+        int timeoutSeconds = config.getInactivityTimeoutSeconds();
+        if (timeoutSeconds <= 0) return;
+
+        long timeoutMillis = timeoutSeconds * 1000L;
+        long now = System.currentTimeMillis();
+
+        for (TradeSession session : new HashSet<>(activeSessions.values())) {
+            if (session.getState() != TradeState.ACTIVE) continue;
+            if (now - session.getLastActivity() >= timeoutMillis) {
+                cancelTrade(session, TradeCancelEvent.Reason.INACTIVITY);
+            }
+        }
     }
 
     // ── XP input ──────────────────────────────────────────────────────────────
@@ -346,6 +390,7 @@ public class TradeManager {
         }
 
         xpInputSessions.remove(player.getUniqueId());
+        session.touch();
 
         boolean isLeft = session.isLeftPlayer(player.getUniqueId());
         if (isLeft) session.setXpLeft(amount);
@@ -374,6 +419,7 @@ public class TradeManager {
     // ── Item change handler ────────────────────────────────────────────────────
 
     public void handleItemChange(TradeSession session, boolean changerIsLeft) {
+        session.touch();
         boolean otherReady = session.isReadyOf(!changerIsLeft);
         if (otherReady) {
             session.setReady(!changerIsLeft, false);
@@ -387,10 +433,31 @@ public class TradeManager {
     // ── Player lifecycle hooks ─────────────────────────────────────────────────
 
     public void onPlayerQuit(Player player) {
-        xpInputSessions.remove(player.getUniqueId());
-        pendingRequests.remove(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        xpInputSessions.remove(uuid);
 
-        TradeSession session = activeSessions.get(player.getUniqueId());
+        // Clean up a request where the quitting player is the receiver
+        TradeRequest asReceiver = pendingRequests.remove(uuid);
+        if (asReceiver != null) asReceiver.cancelExpiryTask();
+
+        // Also clean up any pending requests where the quitting player was the sender,
+        // otherwise the receiver's request would linger until it naturally times out.
+        Iterator<Map.Entry<UUID, TradeRequest>> it = pendingRequests.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, TradeRequest> entry = it.next();
+            TradeRequest request = entry.getValue();
+            if (!request.getSender().equals(uuid)) continue;
+
+            request.cancelExpiryTask();
+            it.remove();
+
+            Player receiver = Bukkit.getPlayer(entry.getKey());
+            if (receiver != null && receiver.isOnline()) {
+                receiver.sendMessage(msg("request-cancelled-sender-quit", "{player}", player.getName()));
+            }
+        }
+
+        TradeSession session = activeSessions.get(uuid);
         if (session != null) cancelTrade(session, TradeCancelEvent.Reason.DISCONNECT);
     }
 
@@ -400,6 +467,13 @@ public class TradeManager {
     }
 
     public void onDisable() {
+        disabling = true;
+
+        if (inactivityCheckTask != null) {
+            inactivityCheckTask.cancel();
+            inactivityCheckTask = null;
+        }
+
         for (TradeSession session : new HashSet<>(activeSessions.values())) {
             cancelTrade(session, TradeCancelEvent.Reason.PLUGIN_DISABLED);
         }

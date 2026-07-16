@@ -20,6 +20,8 @@ public class TradeSession {
     private int countdownRemaining;
     // Set to true when both players belong to allied clans at trade start
     private boolean allyBonus = false;
+    // Timestamp (millis) of the last player activity (item change, ready toggle, xp input)
+    private long lastActivity = System.currentTimeMillis();
 
     public TradeSession(UUID playerLeft, UUID playerRight, Inventory inventory) {
         this.playerLeft = playerLeft;
@@ -72,4 +74,8 @@ public class TradeSession {
 
     public boolean isAllyBonus() { return allyBonus; }
     public void setAllyBonus(boolean allyBonus) { this.allyBonus = allyBonus; }
+
+    public long getLastActivity() { return lastActivity; }
+    /** Marks the session as having had player activity just now (item change, ready toggle, xp input). */
+    public void touch() { this.lastActivity = System.currentTimeMillis(); }
 }

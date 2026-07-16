@@ -14,7 +14,9 @@ public class TradeCancelEvent extends Event {
         DAMAGE,
         DISCONNECT,
         PLUGIN_CANCELLED,
-        PLUGIN_DISABLED
+        PLUGIN_DISABLED,
+        INSUFFICIENT_XP,
+        INACTIVITY
     }
 
     private final TradeSession session;
