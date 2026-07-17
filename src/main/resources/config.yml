@@ -13,7 +13,7 @@ settings:
 #   Пример: -10.0 означает, что оба игрока получают на 10% больше предметов/XP при торговле.
 # enemy-block: запрещать торговлю между игроками из враждебных кланов.
 clan:
-  enabled: false
+  enabled: true
   ally-bonus: -10.0
   enemy-block: true
 
