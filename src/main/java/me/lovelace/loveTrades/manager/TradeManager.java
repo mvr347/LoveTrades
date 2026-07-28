@@ -59,6 +59,12 @@ public class TradeManager {
     // ── Request flow ───────────────────────────────────────────────────────────
 
     public void sendRequest(Player sender, Player target) {
+        // Target has disabled incoming trade requests
+        if (!modifiers.isRequestsEnabled(target.getUniqueId())) {
+            sender.sendMessage(msg("requests-disabled", "{player}", target.getName()));
+            return;
+        }
+
         // Clan enemy check
         if (config.isClanEnabled() && config.isClanEnemyBlock()) {
             ClanIntegration clan = plugin.getClanIntegration();

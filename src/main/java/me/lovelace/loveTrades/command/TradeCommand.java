@@ -1,6 +1,7 @@
 package me.lovelace.loveTrades.command;
 
 import me.lovelace.loveTrades.manager.ConfigManager;
+import me.lovelace.loveTrades.manager.ModifierManager;
 import me.lovelace.loveTrades.manager.TradeManager;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
@@ -11,6 +12,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,10 +20,12 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
 
     private final TradeManager tradeManager;
     private final ConfigManager config;
+    private final ModifierManager modifierManager;
 
-    public TradeCommand(TradeManager tradeManager, ConfigManager config) {
+    public TradeCommand(TradeManager tradeManager, ConfigManager config, ModifierManager modifierManager) {
         this.tradeManager = tradeManager;
         this.config = config;
+        this.modifierManager = modifierManager;
     }
 
     @Override
@@ -53,6 +57,13 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
         // /trade deny <player>
         if (sub.equals("deny") && args.length >= 2) {
             tradeManager.denyRequest(player, args[1]);
+            return true;
+        }
+
+        // /trade toggle - enable/disable receiving trade requests
+        if (sub.equals("toggle")) {
+            boolean nowEnabled = modifierManager.toggleRequestsEnabled(player.getUniqueId());
+            player.sendMessage(legacy(config.getMessage(nowEnabled ? "requests-enabled" : "requests-disabled-self")));
             return true;
         }
 
@@ -98,9 +109,12 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
         if (!(sender instanceof Player)) return List.of();
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
-            return Bukkit.getOnlinePlayers().stream()
+            List<String> suggestions = new ArrayList<>(List.of("accept", "deny", "toggle"));
+            Bukkit.getOnlinePlayers().stream()
                 .filter(p -> !p.equals(sender))
                 .map(Player::getName)
+                .forEach(suggestions::add);
+            return suggestions.stream()
                 .filter(name -> name.toLowerCase().startsWith(partial))
                 .collect(Collectors.toList());
         }
