@@ -20,6 +20,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class TradeManager {
 
@@ -27,9 +28,9 @@ public class TradeManager {
     private final ConfigManager config;
     private final ModifierManager modifiers;
 
-    private final Map<UUID, TradeSession>   activeSessions    = new HashMap<>();
-    private final Map<UUID, TradeRequest>   pendingRequests   = new HashMap<>();
-    private final Map<UUID, XpInputSession> xpInputSessions   = new HashMap<>();
+    private final Map<UUID, TradeSession>   activeSessions    = new ConcurrentHashMap<>();
+    private final Map<UUID, TradeRequest>   pendingRequests   = new ConcurrentHashMap<>();
+    private final Map<UUID, XpInputSession> xpInputSessions   = new ConcurrentHashMap<>();
 
     // UUIDs whose next InventoryCloseEvent should be ignored (programmatic close)
     private final Set<UUID> programmaticCloseSet = new HashSet<>();

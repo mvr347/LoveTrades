@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ModifierManager {
 
@@ -18,7 +19,7 @@ public class ModifierManager {
 
     private final File playersFile;
     private YamlConfiguration playersConfig;
-    private final Map<UUID, Double> playerTaxCache = new HashMap<>();
+    private final Map<UUID, Double> playerTaxCache = new ConcurrentHashMap<>();
 
     public ModifierManager(LoveTrades plugin, ConfigManager configManager) {
         this.plugin = plugin;
