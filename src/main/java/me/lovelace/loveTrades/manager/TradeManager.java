@@ -10,8 +10,6 @@ import me.lovelace.loveTrades.trade.TradeSession;
 import me.lovelace.loveTrades.trade.TradeState;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -93,12 +91,15 @@ public class TradeManager {
 
         sender.sendMessage(msg("request-sent", "{player}", target.getName()));
 
-        // Fix: show sender's name in the target's notification
-        Component clickable = Component.text(sender.getName() + " хочет начать торговлю с вами. ", NamedTextColor.YELLOW)
-            .append(Component.text("[Принять]", NamedTextColor.GREEN).decorate(TextDecoration.BOLD)
+        // Текст уведомления и подписи кнопок берутся из config.yml: раньше они были захардкожены
+        // здесь, из-за чего ключ messages.request-received существовал, но не использовался, и
+        // перевести/изменить это сообщение было нельзя.
+        Component clickable = msg("request-received", "{player}", sender.getName())
+            .append(Component.text(" "))
+            .append(legacy(config.getMessage("request-accept-button", "&a&l[Принять]"))
                 .clickEvent(ClickEvent.runCommand("/trade accept " + sender.getName())))
             .append(Component.text(" "))
-            .append(Component.text("[Отказаться]", NamedTextColor.RED).decorate(TextDecoration.BOLD)
+            .append(legacy(config.getMessage("request-deny-button", "&c&l[Отказаться]"))
                 .clickEvent(ClickEvent.runCommand("/trade deny " + sender.getName())));
         target.sendMessage(clickable);
     }
@@ -140,9 +141,10 @@ public class TradeManager {
         pendingRequests.remove(receiver.getUniqueId());
         request.cancelExpiryTask();
 
-        receiver.sendMessage(legacy("&cВы отклонили запрос на торговлю."));
+        receiver.sendMessage(legacy(config.getMessage("request-denied-self", "&cВы отклонили запрос на торговлю.")));
         if (sender != null) {
-            sender.sendMessage(legacy("&c" + receiver.getName() + " отклонил ваш запрос на торговлю."));
+            sender.sendMessage(legacy(config.getMessage("request-denied-sender", "&c{player} отклонил ваш запрос на торговлю.")
+                    .replace("{player}", receiver.getName())));
         }
     }
 

@@ -34,6 +34,16 @@ public class ConfigManager {
         return msg;
     }
 
+    /**
+     * Как {@link #getMessage(String)}, но с запасным текстом вместо предупреждения. Нужно для
+     * ключей, добавленных позже: config.yml у существующих серверов автоматически не мигрируется,
+     * и без запасного варианта такое сообщение молча стало бы пустым.
+     */
+    public String getMessage(String key, String fallback) {
+        String msg = plugin.getConfig().getString("messages." + key, "");
+        return msg.isEmpty() ? fallback : msg;
+    }
+
     public boolean isClanEnabled()    { return plugin.getConfig().getBoolean("clan.enabled",     false); }
     public double  getClanAllyBonus() { return plugin.getConfig().getDouble("clan.ally-bonus",  -10.0); }
     public boolean isClanEnemyBlock() { return plugin.getConfig().getBoolean("clan.enemy-block", true); }

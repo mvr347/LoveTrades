@@ -37,6 +37,11 @@ modifiers:
 messages:
   request-sent: "&aЗапрос на торговлю отправлен &e{player}&a."
   request-received: "&e{player} &aхочет начать торговлю с вами."
+  # Подписи кнопок в уведомлении о запросе торговли.
+  request-accept-button: "&a&l[Принять]"
+  request-deny-button: "&c&l[Отказаться]"
+  request-denied-self: "&cВы отклонили запрос на торговлю."
+  request-denied-sender: "&c{player} отклонил ваш запрос на торговлю."
   request-expired: "&cЗапрос на торговлю от &e{player} &cистёк."
   request-expired-sender: "&cИгрок &e{player} &cне ответил на запрос торговли."
   trade-cancelled-damage: "&cТорговля отменена, так как один из участников получил урон!"
