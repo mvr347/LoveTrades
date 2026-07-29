@@ -327,6 +327,25 @@ public class TradeManager {
         right.sendMessage(msg("trade-complete", "", ""));
 
         Bukkit.getPluginManager().callEvent(new TradeCompleteEvent(session));
+        reportTradeToCore(session.getPlayerLeft());
+        reportTradeToCore(session.getPlayerRight());
+    }
+
+    /**
+     * Сообщает ядру о завершённой сделке, если LoveCore установлен. Проверка присутствия
+     * плагина обязательна: классы {@code lovecore-api} подключены только в scope provided —
+     * без ядра на сервере их вообще нет на classpath.
+     */
+    private void reportTradeToCore(UUID playerId) {
+        if (Bukkit.getPluginManager().getPlugin("LoveCore") == null) {
+            return;
+        }
+        try {
+            dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.stats.StatBus.class)
+                    .ifPresent(bus -> bus.record(playerId, dev.lovelace.lovecore.api.stats.Metrics.TRADES_COMPLETED, 1));
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Не удалось отчитаться перед LoveCore о завершённой сделке: " + t.getMessage());
+        }
     }
 
     public void cancelTrade(TradeSession session, TradeCancelEvent.Reason reason) {
