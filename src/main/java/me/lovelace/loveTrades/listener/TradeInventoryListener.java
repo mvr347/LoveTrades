@@ -187,6 +187,9 @@ public class TradeInventoryListener implements Listener {
 
         if (session.getState() == TradeState.COUNTDOWN) return;
 
+        // Лимит стаков уже выбран — докидывать нечего
+        if (tradeManager.rejectShiftClickOverLimit(session, isLeft, player)) return;
+
         int[] ownSlots = isLeft ? TradeInventory.LEFT_ITEM_SLOTS : TradeInventory.RIGHT_ITEM_SLOTS;
         Inventory inv  = session.getInventory();
 
