@@ -1,0 +1,7 @@
+# JitPack по умолчанию запускает ./mvnw, а обёртки Maven в репозитории нет —
+# из-за этого сборка падала с "No such file or directory", и соседние плагины
+# экосистемы не могли подтянуть артефакт по коммиту.
+jdk:
+  - openjdk21
+install:
+  - mvn clean install -DskipTests -B
