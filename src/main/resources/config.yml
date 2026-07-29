@@ -56,6 +56,11 @@ modifiers:
 messages:
   request-sent: "&aЗапрос на торговлю отправлен &e{player}&a."
   request-received: "&e{player} &aхочет начать торговлю с вами."
+  # Подписи кнопок в уведомлении о запросе торговли.
+  request-accept-button: "&a&l[Принять]"
+  request-deny-button: "&c&l[Отказаться]"
+  request-denied-self: "&cВы отклонили запрос на торговлю."
+  request-denied-sender: "&c{player} отклонил ваш запрос на торговлю."
   request-expired: "&cЗапрос на торговлю от &e{player} &cистёк."
   request-expired-sender: "&cИгрок &e{player} &cне ответил на запрос торговли."
   trade-cancelled-damage: "&cТорговля отменена, так как один из участников получил урон!"
@@ -85,3 +90,6 @@ messages:
   inventory-full: "&cВаш инвентарь заполнен — предметы выброшены рядом с вами."
   clan-enemy-blocked: "&cВы не можете торговать с игроком из враждебного клана!"
   clan-ally-bonus: "&6⚔ Союзники! Оба игрока получают &e+10%% &6к ресурсам."
+  requests-disabled: "&cИгрок &e{player} &cотключил приём запросов на торговлю."
+  requests-disabled-self: "&cВы отключили приём запросов на торговлю."
+  requests-enabled: "&aВы включили приём запросов на торговлю."

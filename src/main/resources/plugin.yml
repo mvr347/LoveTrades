@@ -7,13 +7,13 @@ load: POSTWORLD
 
 authors: [ Lovelace ]
 
-softdepend: [ LuckPerms ]
+softdepend: [ LuckPerms, PlaceholderAPI ]
 
 commands:
   trade:
     description: "Начать торговлю с другим игроком"
     aliases: [ торговля ]
-    usage: "/trade <игрок>"
+    usage: "/trade <игрок|accept|deny|toggle>"
     permission: axtrades.use
   tradeadmin:
     description: "Административные команды торговли"
