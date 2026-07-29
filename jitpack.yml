@@ -1,7 +1,9 @@
 # JitPack по умолчанию запускает ./mvnw, а обёртки Maven в репозитории нет —
-# из-за этого сборка падала с "No such file or directory", и соседние плагины
-# экосистемы не могли подтянуть артефакт по коммиту.
+# сборка падала с "No such file or directory". Штатный же mvn на образе JitPack
+# слишком старый для maven-compiler-plugin 3.13, поэтому берём свежий Maven
+# отдельно: так сборка на JitPack чинится, не трогая сборку плагина в CI и локально.
 jdk:
   - openjdk21
 install:
-  - mvn clean install -DskipTests -B
+  - curl -sSL https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xz -C /tmp
+  - /tmp/apache-maven-3.9.9/bin/mvn clean install -DskipTests -B
