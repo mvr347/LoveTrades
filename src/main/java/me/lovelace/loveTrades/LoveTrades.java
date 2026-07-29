@@ -9,6 +9,7 @@ import me.lovelace.loveTrades.listener.XpInputListener;
 import me.lovelace.loveTrades.manager.ConfigManager;
 import me.lovelace.loveTrades.manager.ModifierManager;
 import me.lovelace.loveTrades.manager.TradeManager;
+import me.lovelace.loveTrades.placeholder.TradePlaceholderExpansion;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -25,7 +26,7 @@ public final class LoveTrades extends JavaPlugin {
         modifierManager = new ModifierManager(this, configManager);
         tradeManager    = new TradeManager(this, configManager, modifierManager);
 
-        TradeCommand      tradeCmd      = new TradeCommand(tradeManager, configManager);
+        TradeCommand      tradeCmd      = new TradeCommand(tradeManager, configManager, modifierManager);
         TradeAdminCommand tradeAdminCmd = new TradeAdminCommand(modifierManager, configManager);
 
         getCommand("trade").setExecutor(tradeCmd);
@@ -37,6 +38,11 @@ public final class LoveTrades extends JavaPlugin {
         pm.registerEvents(new TradeInventoryListener(tradeManager, this), this);
         pm.registerEvents(new PlayerProtectionListener(tradeManager), this);
         pm.registerEvents(new XpInputListener(tradeManager, this), this);
+
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            new TradePlaceholderExpansion(this, modifierManager).register();
+            getLogger().info("PlaceholderAPI expansion зарегистрирован.");
+        }
 
         getLogger().info("LoveTrades включён.");
     }

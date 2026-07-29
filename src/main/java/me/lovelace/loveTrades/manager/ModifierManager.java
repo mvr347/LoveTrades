@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ModifierManager {
 
@@ -18,7 +19,8 @@ public class ModifierManager {
 
     private final File playersFile;
     private YamlConfiguration playersConfig;
-    private final Map<UUID, Double> playerTaxCache = new HashMap<>();
+    private final Map<UUID, Double> playerTaxCache = new ConcurrentHashMap<>();
+    private final Map<UUID, Boolean> requestsEnabledCache = new ConcurrentHashMap<>();
 
     public ModifierManager(LoveTrades plugin, ConfigManager configManager) {
         this.plugin = plugin;
@@ -41,6 +43,9 @@ public class ModifierManager {
                 UUID uuid = UUID.fromString(key);
                 double tax = section.getDouble(key + ".tax", 0.0);
                 playerTaxCache.put(uuid, tax);
+                if (section.isSet(key + ".requests-enabled")) {
+                    requestsEnabledCache.put(uuid, section.getBoolean(key + ".requests-enabled", true));
+                }
             } catch (IllegalArgumentException ignored) {}
         }
     }
@@ -96,6 +101,28 @@ public class ModifierManager {
         playerTaxCache.remove(uuid);
         playersConfig.set("players." + uuid, null);
         savePlayersData();
+    }
+
+    /**
+     * Whether this player currently accepts incoming trade requests. Defaults to true.
+     */
+    public boolean isRequestsEnabled(UUID uuid) {
+        return requestsEnabledCache.getOrDefault(uuid, true);
+    }
+
+    public void setRequestsEnabled(UUID uuid, boolean enabled) {
+        requestsEnabledCache.put(uuid, enabled);
+        playersConfig.set("players." + uuid + ".requests-enabled", enabled);
+        savePlayersData();
+    }
+
+    /**
+     * Flips the player's requests-enabled state and returns the new value.
+     */
+    public boolean toggleRequestsEnabled(UUID uuid) {
+        boolean newState = !isRequestsEnabled(uuid);
+        setRequestsEnabled(uuid, newState);
+        return newState;
     }
 
     /**

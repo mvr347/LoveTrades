@@ -10,8 +10,6 @@ import me.lovelace.loveTrades.trade.TradeSession;
 import me.lovelace.loveTrades.trade.TradeState;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -20,6 +18,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class TradeManager {
 
@@ -27,9 +26,9 @@ public class TradeManager {
     private final ConfigManager config;
     private final ModifierManager modifiers;
 
-    private final Map<UUID, TradeSession>   activeSessions    = new HashMap<>();
-    private final Map<UUID, TradeRequest>   pendingRequests   = new HashMap<>();
-    private final Map<UUID, XpInputSession> xpInputSessions   = new HashMap<>();
+    private final Map<UUID, TradeSession>   activeSessions    = new ConcurrentHashMap<>();
+    private final Map<UUID, TradeRequest>   pendingRequests   = new ConcurrentHashMap<>();
+    private final Map<UUID, XpInputSession> xpInputSessions   = new ConcurrentHashMap<>();
 
     // UUIDs whose next InventoryCloseEvent should be ignored (programmatic close)
     private final Set<UUID> programmaticCloseSet = new HashSet<>();
@@ -58,6 +57,12 @@ public class TradeManager {
     // ── Request flow ───────────────────────────────────────────────────────────
 
     public void sendRequest(Player sender, Player target) {
+        // Target has disabled incoming trade requests
+        if (!modifiers.isRequestsEnabled(target.getUniqueId())) {
+            sender.sendMessage(msg("requests-disabled", "{player}", target.getName()));
+            return;
+        }
+
         // Clan enemy check
         if (config.isClanEnabled() && config.isClanEnemyBlock()) {
             ClanIntegration clan = plugin.getClanIntegration();
@@ -86,12 +91,15 @@ public class TradeManager {
 
         sender.sendMessage(msg("request-sent", "{player}", target.getName()));
 
-        // Fix: show sender's name in the target's notification
-        Component clickable = Component.text(sender.getName() + " хочет начать торговлю с вами. ", NamedTextColor.YELLOW)
-            .append(Component.text("[Принять]", NamedTextColor.GREEN).decorate(TextDecoration.BOLD)
+        // Текст уведомления и подписи кнопок берутся из config.yml: раньше они были захардкожены
+        // здесь, из-за чего ключ messages.request-received существовал, но не использовался, и
+        // перевести/изменить это сообщение было нельзя.
+        Component clickable = msg("request-received", "{player}", sender.getName())
+            .append(Component.text(" "))
+            .append(legacy(config.getMessage("request-accept-button", "&a&l[Принять]"))
                 .clickEvent(ClickEvent.runCommand("/trade accept " + sender.getName())))
             .append(Component.text(" "))
-            .append(Component.text("[Отказаться]", NamedTextColor.RED).decorate(TextDecoration.BOLD)
+            .append(legacy(config.getMessage("request-deny-button", "&c&l[Отказаться]"))
                 .clickEvent(ClickEvent.runCommand("/trade deny " + sender.getName())));
         target.sendMessage(clickable);
     }
@@ -133,9 +141,10 @@ public class TradeManager {
         pendingRequests.remove(receiver.getUniqueId());
         request.cancelExpiryTask();
 
-        receiver.sendMessage(legacy("&cВы отклонили запрос на торговлю."));
+        receiver.sendMessage(legacy(config.getMessage("request-denied-self", "&cВы отклонили запрос на торговлю.")));
         if (sender != null) {
-            sender.sendMessage(legacy("&c" + receiver.getName() + " отклонил ваш запрос на торговлю."));
+            sender.sendMessage(legacy(config.getMessage("request-denied-sender", "&c{player} отклонил ваш запрос на торговлю.")
+                    .replace("{player}", receiver.getName())));
         }
     }
 
