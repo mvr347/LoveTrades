@@ -3,6 +3,8 @@ package me.lovelace.loveTrades.manager;
 import me.lovelace.loveTrades.LoveTrades;
 import org.bukkit.configuration.file.FileConfiguration;
 
+import java.util.List;
+
 public class ConfigManager {
 
     private final LoveTrades plugin;
@@ -26,6 +28,23 @@ public class ConfigManager {
 
     public int getInactivityTimeoutSeconds() {
         return plugin.getConfig().getInt("settings.inactivity-timeout-seconds", 120);
+    }
+
+    public boolean isBlockInCombat() {
+        return plugin.getConfig().getBoolean("restrictions.block-in-combat", true);
+    }
+
+    public List<String> getCombatMetadataKeys() {
+        List<String> keys = plugin.getConfig().getStringList("restrictions.combat-metadata-keys");
+        return keys.isEmpty() ? List.of("in_combat") : keys;
+    }
+
+    public int getPairCooldownSeconds() {
+        return plugin.getConfig().getInt("restrictions.pair-cooldown-seconds", 180);
+    }
+
+    public int getMaxStacksPerSide() {
+        return plugin.getConfig().getInt("restrictions.max-stacks-per-side", 5);
     }
 
     public String getMessage(String key) {

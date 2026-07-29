@@ -27,6 +27,15 @@ permissions:
   axtrades.bypass.tax:
     description: "Полный обход любых комиссий и налогов"
     default: false
+  axtrades.bypass.combat:
+    description: "Разрешает торговать, находясь в PvP"
+    default: false
+  axtrades.bypass.cooldown:
+    description: "Обход кулдауна между торговлями с одним и тем же игроком"
+    default: false
+  axtrades.bypass.stack-limit:
+    description: "Обход лимита стаков за одну торговлю"
+    default: false
   axtrades.admin:
     description: "Административные команды торговли"
     default: op

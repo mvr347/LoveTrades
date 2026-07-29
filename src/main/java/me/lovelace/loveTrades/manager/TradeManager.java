@@ -25,6 +25,7 @@ public class TradeManager {
     private final LoveTrades plugin;
     private final ConfigManager config;
     private final ModifierManager modifiers;
+    private final TradeRestrictions restrictions;
 
     private final Map<UUID, TradeSession>   activeSessions    = new ConcurrentHashMap<>();
     private final Map<UUID, TradeRequest>   pendingRequests   = new ConcurrentHashMap<>();
@@ -33,18 +34,24 @@ public class TradeManager {
     // UUIDs whose next InventoryCloseEvent should be ignored (programmatic close)
     private final Set<UUID> programmaticCloseSet = new HashSet<>();
 
+    // UUIDs already warned about the stack limit in the current session
+    private final Map<UUID, Boolean> stackLimitWarned = new HashMap<>();
+
     // Set while the plugin is being disabled so item returns happen synchronously
     private boolean disabling = false;
 
     private BukkitTask inactivityCheckTask;
 
     public TradeManager(LoveTrades plugin, ConfigManager config, ModifierManager modifiers) {
-        this.plugin    = plugin;
-        this.config    = config;
-        this.modifiers = modifiers;
+        this.plugin       = plugin;
+        this.config       = config;
+        this.modifiers    = modifiers;
+        this.restrictions = new TradeRestrictions(config);
 
         this.inactivityCheckTask = Bukkit.getScheduler().runTaskTimer(plugin, this::checkInactiveSessions, 20L, 20L);
     }
+
+    public TradeRestrictions getRestrictions() { return restrictions; }
 
     // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -126,6 +133,11 @@ public class TradeManager {
             receiver.sendMessage(msg("already-trading-self", "{player}", ""));
             return;
         }
+
+        // Перепроверяем бой и кулдаун: с момента отправки запроса игроки могли
+        // вступить в схватку, а кулдаун — истечь или, наоборот, начаться.
+        if (!passesPreTradeChecks(receiver, sender)) return;
+
         startTrade(sender, receiver);
     }
 
@@ -180,6 +192,12 @@ public class TradeManager {
 
         session.touch();
         boolean nowReady = !session.isReadyOf(isLeft);
+
+        // Подтвердить готовность можно только уложившись в лимит стаков
+        if (nowReady && restrictions.exceedsStackLimit(player, session.getInventory(), itemSlotsOf(isLeft))) {
+            sendStackLimitMessage(player, session, isLeft);
+            return;
+        }
         session.setReady(isLeft, nowReady);
         TradeInventory.updateStatusSlot(session.getInventory(), isLeft, nowReady);
 
@@ -256,6 +274,14 @@ public class TradeManager {
 
         Inventory inv = session.getInventory();
 
+        // Финальная проверка лимита: предложение могло измениться после подтверждения
+        // готовности (например, через drag, не прошедший проверку при клике).
+        if (restrictions.exceedsStackLimit(left,  inv, TradeInventory.LEFT_ITEM_SLOTS)
+            || restrictions.exceedsStackLimit(right, inv, TradeInventory.RIGHT_ITEM_SLOTS)) {
+            cancelTrade(session, TradeCancelEvent.Reason.STACK_LIMIT);
+            return;
+        }
+
         List<ItemStack> leftOffer  = collectSlots(inv, TradeInventory.LEFT_ITEM_SLOTS);
         List<ItemStack> rightOffer = collectSlots(inv, TradeInventory.RIGHT_ITEM_SLOTS);
 
@@ -294,6 +320,7 @@ public class TradeManager {
         left.giveExpLevels(preEvent.getXpForLeft());
         right.giveExpLevels(preEvent.getXpForRight());
 
+        restrictions.recordCompletedTrade(session.getPlayerLeft(), session.getPlayerRight());
         removeSession(session);
 
         left.sendMessage(msg("trade-complete", "", ""));
@@ -343,6 +370,7 @@ public class TradeManager {
             case DISCONNECT         -> "trade-cancelled-disconnect";
             case INSUFFICIENT_XP    -> "trade-cancelled-insufficient-xp";
             case INACTIVITY         -> "trade-cancelled-inactivity";
+            case STACK_LIMIT        -> "trade-cancelled-stack-limit";
             default                 -> "trade-cancelled-player";
         };
         if (left  != null) left.sendMessage(msg(key, "", ""));
@@ -437,6 +465,84 @@ public class TradeManager {
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
         TradeInventory.refreshInfoSlots(session.getInventory(), session, left, right, modifiers);
+
+        notifyStackLimitState(session, changerIsLeft, changerIsLeft ? left : right);
+    }
+
+    /**
+     * Предупреждает игрока в момент превышения лимита стаков — не на каждый клик,
+     * а только при переходе «в пределах лимита → сверх лимита».
+     */
+    private void notifyStackLimitState(TradeSession session, boolean isLeft, Player player) {
+        if (player == null) return;
+
+        UUID uuid = player.getUniqueId();
+        boolean over = restrictions.exceedsStackLimit(player, session.getInventory(), itemSlotsOf(isLeft));
+        boolean wasOver = Boolean.TRUE.equals(stackLimitWarned.get(uuid));
+
+        if (over && !wasOver) {
+            sendStackLimitMessage(player, session, isLeft);
+            stackLimitWarned.put(uuid, true);
+        } else if (!over && wasOver) {
+            stackLimitWarned.remove(uuid);
+        }
+    }
+
+    private void sendStackLimitMessage(Player player, TradeSession session, boolean isLeft) {
+        int limit = restrictions.effectiveStackLimit(player);
+        if (limit <= 0) return;
+        int current = restrictions.countStacks(session.getInventory(), itemSlotsOf(isLeft));
+        player.sendMessage(msg("stack-limit-exceeded", Map.of(
+            "{max}",     String.valueOf(limit),
+            "{current}", String.valueOf(current))));
+    }
+
+    /**
+     * Не даёт shift-кликом докинуть предметы, когда лимит стаков уже выбран.
+     * Возвращает true, если перенос нужно отменить.
+     */
+    public boolean rejectShiftClickOverLimit(TradeSession session, boolean isLeft, Player player) {
+        int limit = restrictions.effectiveStackLimit(player);
+        if (limit <= 0) return false;
+        if (restrictions.countStacks(session.getInventory(), itemSlotsOf(isLeft)) < limit) return false;
+
+        sendStackLimitMessage(player, session, isLeft);
+        return true;
+    }
+
+    private static int[] itemSlotsOf(boolean isLeft) {
+        return isLeft ? TradeInventory.LEFT_ITEM_SLOTS : TradeInventory.RIGHT_ITEM_SLOTS;
+    }
+
+    /**
+     * Общие проверки перед стартом торговли: PvP и кулдаун пары.
+     * Сообщение получает инициатор действия — отправитель запроса или принимающий.
+     */
+    private boolean passesPreTradeChecks(Player actor, Player other) {
+        if (restrictions.isInCombat(actor)) {
+            actor.sendMessage(msg("trade-blocked-combat-self", "", ""));
+            return false;
+        }
+        if (restrictions.isInCombat(other)) {
+            actor.sendMessage(msg("trade-blocked-combat-other", "{player}", other.getName()));
+            return false;
+        }
+
+        long remaining = restrictions.remainingCooldownSeconds(actor, other);
+        if (remaining > 0) {
+            actor.sendMessage(msg("trade-cooldown", Map.of(
+                "{player}", other.getName(),
+                "{time}",   formatDuration(remaining))));
+            return false;
+        }
+        return true;
+    }
+
+    private static String formatDuration(long seconds) {
+        if (seconds < 60) return seconds + " сек";
+        long minutes = seconds / 60;
+        long rest    = seconds % 60;
+        return rest == 0 ? minutes + " мин" : minutes + " мин " + rest + " сек";
     }
 
     // ── Player lifecycle hooks ─────────────────────────────────────────────────
@@ -489,6 +595,7 @@ public class TradeManager {
         activeSessions.clear();
         pendingRequests.clear();
         xpInputSessions.clear();
+        stackLimitWarned.clear();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -503,6 +610,8 @@ public class TradeManager {
     private void removeSession(TradeSession session) {
         activeSessions.remove(session.getPlayerLeft());
         activeSessions.remove(session.getPlayerRight());
+        stackLimitWarned.remove(session.getPlayerLeft());
+        stackLimitWarned.remove(session.getPlayerRight());
     }
 
     private List<ItemStack> collectSlots(Inventory inv, int[] slots) {
@@ -564,6 +673,14 @@ public class TradeManager {
     private Component msg(String key, String placeholder, String value) {
         String raw = config.getMessage(key);
         if (!placeholder.isEmpty()) raw = raw.replace(placeholder, value);
+        return legacy(raw);
+    }
+
+    private Component msg(String key, Map<String, String> placeholders) {
+        String raw = config.getMessage(key);
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            raw = raw.replace(entry.getKey(), entry.getValue());
+        }
         return legacy(raw);
     }
 
