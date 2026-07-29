@@ -34,15 +34,33 @@ public class TradeRestrictions {
     // ── PvP ───────────────────────────────────────────────────────────────────
 
     /**
-     * Находится ли игрок в бою. Мягкая интеграция через Bukkit Metadata —
-     * DeluxeCombat и большинство combat/antirelog-плагинов помечают игрока
-     * ключом "in_combat" на время схватки. Набор ключей настраивается,
-     * так что плагин с другим ключом подключается без пересборки.
+     * Находится ли игрок в бою. Если LoveCore установлен, спрашиваем его
+     * {@code CombatState} — он знает и про метку стороннего боевого плагина, и про войну или
+     * осаду, чего одна метка не знает: причина отказа «нельзя торговать во время осады»
+     * читается лучше, чем общее «вы в бою». Ядра нет или служба ещё не поднялась — падаем на
+     * прежнюю мягкую интеграцию через Bukkit Metadata: DeluxeCombat и большинство
+     * combat/antirelog-плагинов помечают игрока настраиваемым ключом на время схватки.
      */
     public boolean isInCombat(Player player) {
         if (!config.isBlockInCombat()) return false;
         if (player.hasPermission(BYPASS_COMBAT)) return false;
 
+        if (org.bukkit.Bukkit.getPluginManager().getPlugin("LoveCore") != null) {
+            try {
+                java.util.Optional<Boolean> fromCore = dev.lovelace.lovecore.api.LoveCore
+                        .service(dev.lovelace.lovecore.api.combat.CombatState.class)
+                        .map(state -> state.inCombat(player.getUniqueId()));
+                if (fromCore.isPresent()) {
+                    return fromCore.get();
+                }
+            } catch (Throwable ignored) {
+                // Ядро есть, но служба ещё не поднялась или контракт изменился — падаем на метку.
+            }
+        }
+        return hasCombatMetadata(player);
+    }
+
+    private boolean hasCombatMetadata(Player player) {
         for (String key : config.getCombatMetadataKeys()) {
             for (MetadataValue value : player.getMetadata(key)) {
                 if (value.asBoolean()) return true;
