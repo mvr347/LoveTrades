@@ -7,7 +7,7 @@ load: POSTWORLD
 
 authors: [ Lovelace ]
 
-softdepend: [ LuckPerms, PlaceholderAPI ]
+softdepend: [ LuckPerms, PlaceholderAPI, LoveCore ]
 
 commands:
   trade:
