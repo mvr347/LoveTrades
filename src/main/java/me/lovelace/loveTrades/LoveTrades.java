@@ -63,7 +63,11 @@ public final class LoveTrades extends JavaPlugin {
      */
     public void setClanIntegration(ClanIntegration integration) {
         this.clanIntegration = integration;
-        getLogger().info("Клановая интеграция подключена: " + integration.getClass().getSimpleName());
+        if (integration != null) {
+            getLogger().info("Клановая интеграция подключена: " + integration.getClass().getSimpleName());
+        } else {
+            getLogger().info("Клановая интеграция отключена.");
+        }
     }
 
     public ClanIntegration getClanIntegration() { return clanIntegration; }
