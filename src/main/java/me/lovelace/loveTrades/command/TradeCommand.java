@@ -42,7 +42,7 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 0) {
-            player.sendMessage(legacy("&eИспользование: /trade <игрок>"));
+            sendHelp(player);
             return true;
         }
 
@@ -101,6 +101,18 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
 
         tradeManager.sendRequest(player, target);
         return true;
+    }
+
+    private void sendHelp(Player player) {
+        player.sendMessage(legacy(config.getMessage("help-header", "&8========== &bLoveTrades Помощь &8==========")));
+        player.sendMessage(legacy(config.getMessage("help-trade", "&b/trade <игрок> &7- Отправить запрос на торговлю")));
+        player.sendMessage(legacy(config.getMessage("help-accept", "&b/trade accept <игрок> &7- Принять запрос на торговлю")));
+        player.sendMessage(legacy(config.getMessage("help-deny", "&b/trade deny <игрок> &7- Отклонить запрос на торговлю")));
+        player.sendMessage(legacy(config.getMessage("help-toggle", "&b/trade toggle &7- Вкл/выкл приём запросов на торговлю")));
+        if (player.hasPermission("axtrades.admin")) {
+            player.sendMessage(legacy(config.getMessage("help-lovetradesadmin", "&b/lovetradesadmin &7- Административные команды LoveTrades")));
+        }
+        player.sendMessage(legacy(config.getMessage("help-footer", "&8=========================================")));
     }
 
     @Override
