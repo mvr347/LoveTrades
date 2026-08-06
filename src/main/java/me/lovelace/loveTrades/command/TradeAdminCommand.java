@@ -17,6 +17,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Единая административная команда плагина: {@code /lovetradesadmin <reload|modifier>}.
+ * <p>
+ * Раньше команда регистрировалась только как {@code /tradeadmin}, что не соответствует
+ * принятому в экосистеме Love* стилю {@code love<plugin>admin}. Старое имя оставлено
+ * алиасом в plugin.yml, поэтому ничего не ломается для тех, кто набирает его по привычке.
+ */
 public class TradeAdminCommand implements CommandExecutor, TabCompleter {
 
     private final ModifierManager modifiers;
@@ -31,7 +38,7 @@ public class TradeAdminCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!sender.hasPermission("axtrades.admin")) {
-            sender.sendMessage(legacy("&cНет прав."));
+            sender.sendMessage(legacy(config.getMessage("no-permission", "&cУ вас нет прав для этого действия.")));
             return true;
         }
 
@@ -52,9 +59,9 @@ public class TradeAdminCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleModifier(CommandSender sender, String[] args) {
-        // /tradeadmin modifier set <player> <value>
-        // /tradeadmin modifier remove <player>
-        // /tradeadmin modifier get <player>
+        // /lovetradesadmin modifier set <player> <value>
+        // /lovetradesadmin modifier remove <player>
+        // /lovetradesadmin modifier get <player>
         if (args.length < 3) { sendModifierHelp(sender); return; }
 
         String sub    = args[1].toLowerCase();
@@ -106,15 +113,14 @@ public class TradeAdminCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage(legacy("&6=== TradeAdmin ==="));
-        sender.sendMessage(legacy("&e/tradeadmin reload &7— Перезагрузить конфиг"));
-        sender.sendMessage(legacy("&e/tradeadmin modifier get <игрок> &7— Просмотр налогов"));
-        sender.sendMessage(legacy("&e/tradeadmin modifier set <игрок> <значение> &7— Установить налог"));
-        sender.sendMessage(legacy("&e/tradeadmin modifier remove <игрок> &7— Удалить налог"));
+        sender.sendMessage(legacy(config.getMessage("admin-help-header", "&8========== &bLoveTrades Admin &8==========")));
+        sender.sendMessage(legacy(config.getMessage("admin-help-reload", "&b/lovetradesadmin reload &7- Перезагрузить конфигурацию")));
+        sender.sendMessage(legacy(config.getMessage("admin-help-modifier", "&b/lovetradesadmin modifier <get|set|remove> <игрок> [значение] &7- Индивидуальные налоги")));
+        sender.sendMessage(legacy(config.getMessage("admin-help-footer", "&8=========================================")));
     }
 
     private void sendModifierHelp(CommandSender sender) {
-        sender.sendMessage(legacy("&eИспользование: /tradeadmin modifier <get|set|remove> <игрок> [значение]"));
+        sender.sendMessage(legacy("&eИспользование: /lovetradesadmin modifier <get|set|remove> <игрок> [значение]"));
     }
 
     @Override

@@ -93,3 +93,18 @@ messages:
   requests-disabled: "&cИгрок &e{player} &cотключил приём запросов на торговлю."
   requests-disabled-self: "&cВы отключили приём запросов на торговлю."
   requests-enabled: "&aВы включили приём запросов на торговлю."
+
+  # Список команд (/trade без аргументов).
+  help-header: "&8========== &bLoveTrades Помощь &8=========="
+  help-trade: "&b/trade <игрок> &7- Отправить запрос на торговлю"
+  help-accept: "&b/trade accept <игрок> &7- Принять запрос на торговлю"
+  help-deny: "&b/trade deny <игрок> &7- Отклонить запрос на торговлю"
+  help-toggle: "&b/trade toggle &7- Вкл/выкл приём запросов на торговлю"
+  help-lovetradesadmin: "&b/lovetradesadmin &7- Административные команды LoveTrades"
+  help-footer: "&8========================================="
+
+  # Список команд (/lovetradesadmin без аргументов).
+  admin-help-header: "&8========== &bLoveTrades Admin &8=========="
+  admin-help-reload: "&b/lovetradesadmin reload &7- Перезагрузить конфигурацию"
+  admin-help-modifier: "&b/lovetradesadmin modifier <get|set|remove> <игрок> [значение] &7- Индивидуальные налоги"
+  admin-help-footer: "&8========================================="

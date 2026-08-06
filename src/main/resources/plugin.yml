@@ -12,12 +12,13 @@ softdepend: [ LuckPerms, PlaceholderAPI, LoveCore ]
 commands:
   trade:
     description: "Начать торговлю с другим игроком"
-    aliases: [ торговля ]
+    aliases: [ lovetrades, торговля ]
     usage: "/trade <игрок|accept|deny|toggle>"
     permission: axtrades.use
-  tradeadmin:
+  lovetradesadmin:
     description: "Административные команды торговли"
-    usage: "/tradeadmin <modifier|reload>"
+    aliases: [ tradeadmin ]
+    usage: "/lovetradesadmin <reload|modifier>"
     permission: axtrades.admin
 
 permissions:

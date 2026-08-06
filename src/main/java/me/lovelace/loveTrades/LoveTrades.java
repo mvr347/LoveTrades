@@ -31,8 +31,10 @@ public final class LoveTrades extends JavaPlugin {
 
         getCommand("trade").setExecutor(tradeCmd);
         getCommand("trade").setTabCompleter(tradeCmd);
-        getCommand("tradeadmin").setExecutor(tradeAdminCmd);
-        getCommand("tradeadmin").setTabCompleter(tradeAdminCmd);
+        // /tradeadmin is registered as an alias in plugin.yml so it keeps working
+        // for admins used to the old name.
+        getCommand("lovetradesadmin").setExecutor(tradeAdminCmd);
+        getCommand("lovetradesadmin").setTabCompleter(tradeAdminCmd);
 
         PluginManager pm = getServer().getPluginManager();
         pm.registerEvents(new TradeInventoryListener(tradeManager, this), this);
