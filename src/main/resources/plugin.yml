@@ -2,7 +2,7 @@ name: LoveTrades
 version: '${version}'
 
 main: me.lovelace.loveTrades.LoveTrades
-api-version: '1.21.11'
+api-version: '26.2'
 load: POSTWORLD
 
 authors: [ Lovelace ]
