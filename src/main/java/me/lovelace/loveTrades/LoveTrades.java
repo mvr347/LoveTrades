@@ -11,6 +11,7 @@ import me.lovelace.loveTrades.manager.ModifierManager;
 import me.lovelace.loveTrades.manager.TradeManager;
 import me.lovelace.loveTrades.placeholder.TradePlaceholderExpansion;
 import org.bukkit.plugin.PluginManager;
+import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class LoveTrades extends JavaPlugin {
@@ -51,6 +52,7 @@ public final class LoveTrades extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        HandlerList.unregisterAll(this);
         if (tradeManager != null) tradeManager.onDisable();
         if (modifierManager != null) modifierManager.savePlayersData();
         getLogger().info("LoveTrades выключён.");
