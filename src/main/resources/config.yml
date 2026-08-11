@@ -37,20 +37,20 @@ clan:
   enemy-block: true
 
 # Модификаторы налогов по группам прав.
-# Игроку нужен перм axtrades.modifier.<name> для применения группы.
+# Игроку нужен перм lovetrades.modifier.<name> для применения группы.
 # tax: положительное — налог (получатель получает меньше)
 #      отрицательное — бонус (получатель получает больше; применяется к предметам и XP)
 # Индивидуальные модификаторы игроков хранятся в data/players.yml и суммируются с групповым.
 modifiers:
   groups:
     vip:
-      permission: "axtrades.modifier.vip"
+      permission: "lovetrades.modifier.vip"
       tax: -10.0
     donor:
-      permission: "axtrades.modifier.donor"
+      permission: "lovetrades.modifier.donor"
       tax: 15.0
     newcomer:
-      permission: "axtrades.modifier.newcomer"
+      permission: "lovetrades.modifier.newcomer"
       tax: 25.0
 
 messages:

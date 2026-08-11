@@ -37,7 +37,7 @@ public class TradeAdminCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
-        if (!sender.hasPermission("axtrades.admin")) {
+        if (!sender.hasPermission("lovetrades.admin")) {
             sender.sendMessage(legacy(config.getMessage("no-permission", "&cУ вас нет прав для этого действия.")));
             return true;
         }
@@ -126,7 +126,7 @@ public class TradeAdminCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String alias, @NotNull String[] args) {
-        if (!sender.hasPermission("axtrades.admin")) return List.of();
+        if (!sender.hasPermission("lovetrades.admin")) return List.of();
         return switch (args.length) {
             case 1 -> List.of("reload", "modifier").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).collect(Collectors.toList());

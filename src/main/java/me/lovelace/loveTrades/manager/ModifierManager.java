@@ -61,10 +61,10 @@ public class ModifierManager {
     /**
      * Effective tax applied to items/XP received by this player.
      * = group tax + individual tax + extraModifier (pass ally bonus here as a negative value).
-     * Returns 0 if axtrades.bypass.tax is set (extraModifier is also suppressed in that case).
+     * Returns 0 if lovetrades.bypass.tax is set (extraModifier is also suppressed in that case).
      */
     public double getEffectiveTax(Player receiver, double extraModifier) {
-        if (receiver.hasPermission("axtrades.bypass.tax")) return 0.0;
+        if (receiver.hasPermission("lovetrades.bypass.tax")) return 0.0;
         double groupTax  = resolveGroupTax(receiver);
         double playerTax = playerTaxCache.getOrDefault(receiver.getUniqueId(), 0.0);
         return groupTax + playerTax + extraModifier;
