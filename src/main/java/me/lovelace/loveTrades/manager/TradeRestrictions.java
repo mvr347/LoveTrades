@@ -18,9 +18,9 @@ import java.util.UUID;
  */
 public class TradeRestrictions {
 
-    public static final String BYPASS_COMBAT = "axtrades.bypass.combat";
-    public static final String BYPASS_COOLDOWN = "axtrades.bypass.cooldown";
-    public static final String BYPASS_STACK_LIMIT = "axtrades.bypass.stack-limit";
+    public static final String BYPASS_COMBAT = "lovetrades.bypass.combat";
+    public static final String BYPASS_COOLDOWN = "lovetrades.bypass.cooldown";
+    public static final String BYPASS_STACK_LIMIT = "lovetrades.bypass.stack-limit";
 
     private final ConfigManager config;
 

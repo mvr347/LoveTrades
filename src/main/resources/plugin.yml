@@ -14,29 +14,29 @@ commands:
     description: "Начать торговлю с другим игроком"
     aliases: [ lovetrades, торговля ]
     usage: "/trade <игрок|accept|deny|toggle>"
-    permission: axtrades.use
+    permission: lovetrades.use
   lovetradesadmin:
     description: "Административные команды торговли"
     aliases: [ tradeadmin ]
     usage: "/lovetradesadmin <reload|modifier>"
-    permission: axtrades.admin
+    permission: lovetrades.admin
 
 permissions:
-  axtrades.use:
+  lovetrades.use:
     description: "Разрешает использование команды /trade"
     default: true
-  axtrades.bypass.tax:
+  lovetrades.bypass.tax:
     description: "Полный обход любых комиссий и налогов"
     default: false
-  axtrades.bypass.combat:
+  lovetrades.bypass.combat:
     description: "Разрешает торговать, находясь в PvP"
     default: false
-  axtrades.bypass.cooldown:
+  lovetrades.bypass.cooldown:
     description: "Обход кулдауна между торговлями с одним и тем же игроком"
     default: false
-  axtrades.bypass.stack-limit:
+  lovetrades.bypass.stack-limit:
     description: "Обход лимита стаков за одну торговлю"
     default: false
-  axtrades.admin:
+  lovetrades.admin:
     description: "Административные команды торговли"
     default: op

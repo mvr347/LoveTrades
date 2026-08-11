@@ -36,7 +36,7 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (!player.hasPermission("axtrades.use")) {
+        if (!player.hasPermission("lovetrades.use")) {
             player.sendMessage(legacy(config.getMessage("no-permission")));
             return true;
         }
@@ -109,7 +109,7 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(legacy(config.getMessage("help-accept", "&b/trade accept <игрок> &7- Принять запрос на торговлю")));
         player.sendMessage(legacy(config.getMessage("help-deny", "&b/trade deny <игрок> &7- Отклонить запрос на торговлю")));
         player.sendMessage(legacy(config.getMessage("help-toggle", "&b/trade toggle &7- Вкл/выкл приём запросов на торговлю")));
-        if (player.hasPermission("axtrades.admin")) {
+        if (player.hasPermission("lovetrades.admin")) {
             player.sendMessage(legacy(config.getMessage("help-lovetradesadmin", "&b/lovetradesadmin &7- Административные команды LoveTrades")));
         }
         player.sendMessage(legacy(config.getMessage("help-footer", "&8=========================================")));
@@ -118,7 +118,7 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String alias, @NotNull String[] args) {
-        if (!(sender instanceof Player)) return List.of();
+        if (!(sender instanceof Player player) || !player.hasPermission("lovetrades.use")) return List.of();
         if (args.length == 1) {
             String partial = args[0].toLowerCase();
             List<String> suggestions = new ArrayList<>(List.of("accept", "deny", "toggle"));
