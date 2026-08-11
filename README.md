@@ -18,8 +18,8 @@ LoveTrades предоставляет безопасный механизм об
 
 | Команда | Алиасы | Описание | Пермишин |
 |---|---|---|---|
-| `/trade` | `lovetrades`, `торговля` | Инициировать торговлю | `axtrades.use` |
-| `/lovetradesadmin` | `tradeadmin` | Административные команды | `axtrades.admin` |
+| `/trade` | `lovetrades`, `торговля` | Инициировать торговлю | `lovetrades.use` |
+| `/lovetradesadmin` | `tradeadmin` | Административные команды | `lovetrades.admin` |
 
 ### Подкоманды `/trade`
 
@@ -39,12 +39,12 @@ LoveTrades предоставляет безопасный механизм об
 
 | Пермишин | Описание | Default |
 |---|---|---|
-| `axtrades.use` | Разрешает команду `/trade` | true |
-| `axtrades.bypass.tax` | Полный обход налогов и комиссий | false |
-| `axtrades.bypass.combat` | Торговля в режиме PvP боя | false |
-| `axtrades.bypass.cooldown` | Обход кулдауна между торговлями | false |
-| `axtrades.bypass.stack-limit` | Обход лимита стеков | false |
-| `axtrades.admin` | Административные команды | op |
+| `lovetrades.use` | Разрешает команду `/trade` | true |
+| `lovetrades.bypass.tax` | Полный обход налогов и комиссий | false |
+| `lovetrades.bypass.combat` | Торговля в режиме PvP боя | false |
+| `lovetrades.bypass.cooldown` | Обход кулдауна между торговлями | false |
+| `lovetrades.bypass.stack-limit` | Обход лимита стеков | false |
+| `lovetrades.admin` | Административные команды | op |
 
 ## Конфигурация
 
@@ -209,5 +209,5 @@ Java 21, Paper 1.21+, load: POSTWORLD (загружается после мир�
 - Торговля атомарна — если произойдёт ошибка, всё откатывается и предметы возвращаются
 - Предметы с NBT (чары, ники и т.д.) сохраняют свои данные при торговле
 - История торговель используется в случае спора между игроками
-- Администраторы с `axtrades.admin` могут посмотреть полную историю любого игрока
+- Администраторы с `lovetrades.admin` могут посмотреть полную историю любого игрока
 - Налоги накапливаются на счёте сервера для использования в экономике
