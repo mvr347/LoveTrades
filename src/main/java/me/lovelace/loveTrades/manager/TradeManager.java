@@ -293,8 +293,10 @@ public class TradeManager {
         double leftTax  = modifiers.getEffectiveTax(left,  allyMod);
         double rightTax = modifiers.getEffectiveTax(right, allyMod);
 
-        List<ItemStack> itemsForRight = applyItemTax(leftOffer,  rightTax);
-        List<ItemStack> itemsForLeft  = applyItemTax(rightOffer, leftTax);
+        // Единый налог LoveCore считается по получателю — тот же принцип, что и rightTax/leftTax
+        // выше (получатель платит за свою же ставку, не за чужую).
+        List<ItemStack> itemsForRight = applyCoinTax(applyItemTax(leftOffer,  rightTax), right.getUniqueId());
+        List<ItemStack> itemsForLeft  = applyCoinTax(applyItemTax(rightOffer, leftTax),  left.getUniqueId());
 
         // XP levels: left offers xpLeft to right, right offers xpRight to left
         int xpForRight = modifiers.applyXpTax(session.getXpLeft(),  rightTax);
@@ -657,6 +659,38 @@ public class TradeManager {
                     copy.setAmount(newAmount);
                     result.add(copy);
                 }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Поверх обычного {@link #applyItemTax}, применяет единый налог LoveCore к монетам
+     * (LoveCore.LoveEconomy) в предложении — по ставке {@link dev.lovelace.lovecore.api.economy.TaxOracle#tradeRate(UUID)}
+     * получателя (смягчённая для сделок между игроками, кроме ужасной вежливости). Не трогает
+     * обычные предметы — только стеки, которые экономика ядра распознаёт как монету. Не
+     * изменяет ничего, если LoveCore/TaxOracle/LoveEconomy недоступны.
+     */
+    private List<ItemStack> applyCoinTax(List<ItemStack> items, UUID receiverId) {
+        var economyOpt = dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.economy.LoveEconomy.class);
+        var taxOpt = dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.economy.TaxOracle.class);
+        if (economyOpt.isEmpty() || taxOpt.isEmpty()) {
+            return items;
+        }
+        var economy = economyOpt.get();
+        var tax = taxOpt.get();
+
+        List<ItemStack> result = new ArrayList<>();
+        for (ItemStack item : items) {
+            if (!economy.isCoin(item)) {
+                result.add(item);
+                continue;
+            }
+            long newAmount = tax.applyTradePayout(receiverId, item.getAmount());
+            if (newAmount > 0) {
+                ItemStack copy = item.clone();
+                copy.setAmount((int) Math.min(newAmount, item.getAmount()));
+                result.add(copy);
             }
         }
         return result;
