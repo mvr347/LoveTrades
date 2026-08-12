@@ -63,7 +63,8 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
         // /trade toggle - enable/disable receiving trade requests
         if (sub.equals("toggle")) {
             boolean nowEnabled = modifierManager.toggleRequestsEnabled(player.getUniqueId());
-            player.sendMessage(legacy(config.getMessage(nowEnabled ? "requests-enabled" : "requests-disabled-self")));
+            player.sendMessage(legacy(config.getMessage(nowEnabled ? "requests-enabled" : "requests-disabled-self",
+                    nowEnabled ? "&aВы включили приём запросов на торговлю." : "&cВы отключили приём запросов на торговлю.")));
             return true;
         }
 
