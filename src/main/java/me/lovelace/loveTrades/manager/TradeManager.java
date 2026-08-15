@@ -71,12 +71,9 @@ public class TradeManager {
         }
 
         // Clan enemy check
-        if (config.isClanEnabled() && config.isClanEnemyBlock()) {
-            ClanIntegration clan = plugin.getClanIntegration();
-            if (clan != null && clan.isEnemy(sender, target)) {
-                sender.sendMessage(msg("clan-enemy-blocked", "", ""));
-                return;
-            }
+        if (isClanEnemy(sender, target)) {
+            sender.sendMessage(msg("clan-enemy-blocked", "", ""));
+            return;
         }
 
         TradeRequestEvent event = new TradeRequestEvent(sender, target);
@@ -138,6 +135,14 @@ public class TradeManager {
         // вступить в схватку, а кулдаун — истечь или, наоборот, начаться.
         if (!passesPreTradeChecks(receiver, sender)) return;
 
+        // Перепроверяем статус клана: враждебность могла наступить уже после отправки
+        // запроса (например, объявление войны), пока он ждал принятия — без этой проверки
+        // блок торговли с врагом обходился простым таймингом.
+        if (isClanEnemy(sender, receiver)) {
+            receiver.sendMessage(msg("clan-enemy-blocked", "", ""));
+            return;
+        }
+
         startTrade(sender, receiver);
     }
 
@@ -179,7 +184,7 @@ public class TradeManager {
         activeSessions.put(left.getUniqueId(),  session);
         activeSessions.put(right.getUniqueId(), session);
 
-        TradeInventory.initLayout(inv, session, left, right, modifiers);
+        TradeInventory.initLayout(inv, session, left, right, modifiers, config.getClanAllyBonus());
 
         Bukkit.getPluginManager().callEvent(new TradeStartEvent(left, right, session));
 
@@ -246,7 +251,7 @@ public class TradeManager {
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
 
-        TradeInventory.restoreNormalLayout(session.getInventory(), session, left, right, modifiers);
+        TradeInventory.restoreNormalLayout(session.getInventory(), session, left, right, modifiers, config.getClanAllyBonus());
 
         Bukkit.getPluginManager().callEvent(
             new TradeCountdownCancelEvent(session, canceller, reason));
@@ -269,6 +274,13 @@ public class TradeManager {
         // case would create XP out of nothing, so bail out instead.
         if (left.getLevel() < session.getXpLeft() || right.getLevel() < session.getXpRight()) {
             cancelTrade(session, TradeCancelEvent.Reason.INSUFFICIENT_XP);
+            return;
+        }
+
+        // Re-check clan relationship right before payout too: the pair could have gone to war
+        // during the trade/countdown window, not just between request and accept.
+        if (isClanEnemy(left, right)) {
+            cancelTrade(session, TradeCancelEvent.Reason.CLAN_ENEMY);
             return;
         }
 
@@ -392,6 +404,7 @@ public class TradeManager {
             case INSUFFICIENT_XP    -> "trade-cancelled-insufficient-xp";
             case INACTIVITY         -> "trade-cancelled-inactivity";
             case STACK_LIMIT        -> "trade-cancelled-stack-limit";
+            case CLAN_ENEMY         -> "clan-enemy-blocked";
             default                 -> "trade-cancelled-player";
         };
         if (left  != null) left.sendMessage(msg(key, "", ""));
@@ -465,7 +478,7 @@ public class TradeManager {
 
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
-        TradeInventory.refreshInfoSlots(session.getInventory(), session, left, right, modifiers);
+        TradeInventory.refreshInfoSlots(session.getInventory(), session, left, right, modifiers, config.getClanAllyBonus());
 
         player.sendMessage(msg("xp-set", "{amount}", String.valueOf(amount)));
     }
@@ -485,7 +498,7 @@ public class TradeManager {
         }
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
-        TradeInventory.refreshInfoSlots(session.getInventory(), session, left, right, modifiers);
+        TradeInventory.refreshInfoSlots(session.getInventory(), session, left, right, modifiers, config.getClanAllyBonus());
 
         notifyStackLimitState(session, changerIsLeft, changerIsLeft ? left : right);
     }
@@ -529,6 +542,13 @@ public class TradeManager {
 
         sendStackLimitMessage(player, session, isLeft);
         return true;
+    }
+
+    /** Whether the two players' clans are currently in a hostile relationship, per config + integration. */
+    private boolean isClanEnemy(Player a, Player b) {
+        if (!config.isClanEnabled() || !config.isClanEnemyBlock()) return false;
+        ClanIntegration clan = plugin.getClanIntegration();
+        return clan != null && clan.isEnemy(a, b);
     }
 
     private static int[] itemSlotsOf(boolean isLeft) {
@@ -622,10 +642,23 @@ public class TradeManager {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void closeInventoriesProgrammatically(TradeSession session, Player left, Player right) {
-        if (left  != null) programmaticCloseSet.add(left.getUniqueId());
-        if (right != null) programmaticCloseSet.add(right.getUniqueId());
-        if (left  != null) left.closeInventory();
-        if (right != null) right.closeInventory();
+        closeIfViewingSession(session, left);
+        closeIfViewingSession(session, right);
+    }
+
+    /**
+     * Only marks/closes a player's inventory if they are actually still looking at this trade's
+     * GUI. Without this check, a player whose own action already closed the inventory (e.g. the
+     * manual close that triggered this very cancellation) still gets added to
+     * {@code programmaticCloseSet}, and since nothing ever consumes that entry for them, it sits
+     * in the set until they happen to close some unrelated inventory later — a small unbounded
+     * leak whenever that never happens.
+     */
+    private void closeIfViewingSession(TradeSession session, Player player) {
+        if (player == null || !player.isOnline()) return;
+        if (!player.getOpenInventory().getTopInventory().equals(session.getInventory())) return;
+        programmaticCloseSet.add(player.getUniqueId());
+        player.closeInventory();
     }
 
     private void removeSession(TradeSession session) {
@@ -714,7 +747,15 @@ public class TradeManager {
             : Bukkit.getPlayer(ownerUuid);
         if (player != null && player.isOnline()) {
             giveItems(player, items);
+            return;
         }
+        // Both participants were expected to be resolvable here (completeTrade/cancelTrade only
+        // reach this path with a Player reference fetched moments earlier), but a mass-disconnect
+        // between that lookup and here can still leave nobody to hand the items to. There is no
+        // offline mailbox in this plugin, so previously these items were dropped with zero trace —
+        // log loudly instead of silently vanishing them, so admins can compensate the player.
+        plugin.getLogger().severe(() -> "Не удалось вернуть " + items.size()
+            + " предмет(ов) игроку " + ownerUuid + " — игрок оффлайн, предметы потеряны: " + items);
     }
 
     /** Deduct XP levels from player, clamped at 0. */

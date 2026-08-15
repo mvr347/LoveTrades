@@ -17,7 +17,8 @@ public class TradeCancelEvent extends Event {
         PLUGIN_DISABLED,
         INSUFFICIENT_XP,
         INACTIVITY,
-        STACK_LIMIT
+        STACK_LIMIT,
+        CLAN_ENEMY
     }
 
     private final TradeSession session;
