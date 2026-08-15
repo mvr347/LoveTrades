@@ -55,7 +55,7 @@ public final class TradeInventory {
 
     /** Initialises all control elements. Call once after session creation. Item slots are left empty. */
     public static void initLayout(Inventory inv, TradeSession session,
-                                  Player left, Player right, ModifierManager mods) {
+                                  Player left, Player right, ModifierManager mods, double allyBonusPercent) {
         ItemStack sep = makePane(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int s : SEPARATOR_SLOTS) inv.setItem(s, sep);
 
@@ -66,12 +66,12 @@ public final class TradeInventory {
         updateStatusSlot(inv, false, false);
         updateXpSlot(inv, true,  0);
         updateXpSlot(inv, false, 0);
-        refreshInfoSlots(inv, session, left, right, mods);
+        refreshInfoSlots(inv, session, left, right, mods, allyBonusPercent);
     }
 
     /** Restores normal control layout after countdown cancellation. Does NOT touch item slots. */
     public static void restoreNormalLayout(Inventory inv, TradeSession session,
-                                           Player left, Player right, ModifierManager mods) {
+                                           Player left, Player right, ModifierManager mods, double allyBonusPercent) {
         ItemStack sep = makePane(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int s : SEPARATOR_SLOTS) inv.setItem(s, sep);
 
@@ -79,7 +79,7 @@ public final class TradeInventory {
         updateStatusSlot(inv, false, false);
         updateXpSlot(inv, true,  session.getXpLeft());
         updateXpSlot(inv, false, session.getXpRight());
-        refreshInfoSlots(inv, session, left, right, mods);
+        refreshInfoSlots(inv, session, left, right, mods, allyBonusPercent);
     }
 
     /** Switches the separator and status buttons to countdown mode. */
@@ -129,9 +129,12 @@ public final class TradeInventory {
     }
 
     public static void refreshInfoSlots(Inventory inv, TradeSession session,
-                                        Player left, Player right, ModifierManager mods) {
-        double leftTax  = left  != null ? mods.getEffectiveTax(left)  : 0.0;
-        double rightTax = right != null ? mods.getEffectiveTax(right) : 0.0;
+                                        Player left, Player right, ModifierManager mods, double allyBonusPercent) {
+        // Ally modifier must mirror TradeManager#completeTrade exactly, otherwise the rate shown
+        // here in the GUI diverges from the rate actually applied at payout.
+        double allyMod  = session.isAllyBonus() ? allyBonusPercent : 0.0;
+        double leftTax  = left  != null ? mods.getEffectiveTax(left,  allyMod) : 0.0;
+        double rightTax = right != null ? mods.getEffectiveTax(right, allyMod) : 0.0;
 
         int leftCount  = countItems(inv, LEFT_ITEM_SLOTS);
         int rightCount = countItems(inv, RIGHT_ITEM_SLOTS);
@@ -139,8 +142,10 @@ public final class TradeInventory {
         List<Component> leftLore = new ArrayList<>();
         leftLore.add(legacy("&7Предметов: &f" + leftCount + " ед."));
         leftLore.add(legacy("&7Опыт: &f" + session.getXpLeft() + " ур."));
-        leftLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", Math.max(0, rightTax))));
-        if (session.isAllyBonus()) leftLore.add(legacy("&6⚔ Союз: &a-10%% к налогу"));
+        // Not clamped to 0: a negative rate is a real bonus applied at payout (e.g. ally discount
+        // with no other tax) and must be shown as such, not hidden behind a floor of "0%".
+        leftLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", rightTax)));
+        if (session.isAllyBonus()) leftLore.add(legacy(String.format("&6⚔ Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
 
         ItemStack leftInfo = makeInfoBook(legacy("&6&lВаше предложение"), leftLore);
         for (int s : LEFT_INFO_SLOTS) inv.setItem(s, leftInfo);
@@ -148,8 +153,8 @@ public final class TradeInventory {
         List<Component> rightLore = new ArrayList<>();
         rightLore.add(legacy("&7Предметов: &f" + rightCount + " ед."));
         rightLore.add(legacy("&7Опыт: &f" + session.getXpRight() + " ур."));
-        rightLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", Math.max(0, leftTax))));
-        if (session.isAllyBonus()) rightLore.add(legacy("&6⚔ Союз: &a-10%% к налогу"));
+        rightLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", leftTax)));
+        if (session.isAllyBonus()) rightLore.add(legacy(String.format("&6⚔ Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
 
         ItemStack rightInfo = makeInfoBook(legacy("&6&lПредложение партнёра"), rightLore);
         for (int s : RIGHT_INFO_SLOTS) inv.setItem(s, rightInfo);
