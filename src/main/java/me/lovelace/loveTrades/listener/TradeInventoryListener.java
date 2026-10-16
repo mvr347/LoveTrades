@@ -88,7 +88,9 @@ public class TradeInventoryListener implements Listener {
         int myXp     = isLeft ? TradeInventory.LEFT_XP_SLOT     : TradeInventory.RIGHT_XP_SLOT;
 
         if (inMySlots) {
-            // Allow — but schedule a post-tick check to handle ready-reset and info refresh
+            // Allow — reset the other side's ready NOW (before the change lands); only the
+            // info refresh is deferred to the post-tick check
+            tradeManager.resetOtherReady(session, isLeft);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (session.getState() == TradeState.ACTIVE) {
                     tradeManager.handleItemChange(session, isLeft);
@@ -141,7 +143,8 @@ public class TradeInventoryListener implements Listener {
             return;
         }
 
-        // Valid drag in own slots — schedule item change check
+        // Valid drag in own slots — reset ready synchronously, defer the info refresh
+        tradeManager.resetOtherReady(session, isLeft);
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (session.getState() == TradeState.ACTIVE) {
                 tradeManager.handleItemChange(session, isLeft);
@@ -233,6 +236,7 @@ public class TradeInventoryListener implements Listener {
     }
 
     private void scheduleItemChange(TradeSession session, boolean isLeft) {
+        tradeManager.resetOtherReady(session, isLeft);
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (session.getState() == TradeState.ACTIVE) {
                 tradeManager.handleItemChange(session, isLeft);

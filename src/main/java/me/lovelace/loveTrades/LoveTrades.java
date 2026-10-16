@@ -39,6 +39,12 @@ public final class LoveTrades extends JavaPlugin {
         PluginManager pm = getServer().getPluginManager();
         pm.registerEvents(new TradeInventoryListener(tradeManager, this), this);
         pm.registerEvents(new PlayerProtectionListener(tradeManager), this);
+        pm.registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void onJoin(org.bukkit.event.player.PlayerJoinEvent e) {
+                tradeManager.deliverPendingReturns(e.getPlayer());
+            }
+        }, this);
         pm.registerEvents(new XpInputListener(tradeManager, this), this);
 
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
