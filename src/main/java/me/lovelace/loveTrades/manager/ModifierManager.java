@@ -126,21 +126,20 @@ public class ModifierManager {
     }
 
     /**
-     * Applies tax to a stackable item amount.
-     * Positive tax reduces the amount (items burned). Negative tax creates a bonus
-     * (e.g. -10 means receiver gets 10% extra items). Cap: max 100% tax (0 items),
-     * no cap on the negative (bonus) side.
+     * Clamps a tax rate to [0, 100]. A negative rate (ally/VIP "bonus") must never multiply
+     * traded goods: that would mint items/XP out of nothing, so it is treated as no tax.
      */
-    public int applyItemTax(int amount, double effectiveTax) {
-        double rate = Math.min(100.0, effectiveTax); // allow negative (bonus), cap at 100
-        return Math.max(0, (int) Math.floor(amount * (1.0 - rate / 100.0)));
+    public static double clampRate(double effectiveTax) {
+        return Math.max(0.0, Math.min(100.0, effectiveTax));
     }
 
-    /**
-     * Applies tax to XP levels.
-     * Negative tax (bonus) can increase XP; result is clamped at 0.
-     */
-    public int applyXpTax(int amount, double effectiveTax) {
-        return Math.max(0, (int) Math.floor(amount * (1.0 - effectiveTax / 100.0)));
+    /** Applies tax to a stackable item amount. Rate is clamped to [0, 100]; result never exceeds the input. */
+    public static int applyItemTax(int amount, double effectiveTax) {
+        return Math.max(0, (int) Math.floor(amount * (1.0 - clampRate(effectiveTax) / 100.0)));
+    }
+
+    /** Applies tax to XP levels. Rate is clamped to [0, 100]; result never exceeds the input. */
+    public static int applyXpTax(int amount, double effectiveTax) {
+        return Math.max(0, (int) Math.floor(amount * (1.0 - clampRate(effectiveTax) / 100.0)));
     }
 }

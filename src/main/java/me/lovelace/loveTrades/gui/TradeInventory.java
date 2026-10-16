@@ -133,8 +133,8 @@ public final class TradeInventory {
         // Ally modifier must mirror TradeManager#completeTrade exactly, otherwise the rate shown
         // here in the GUI diverges from the rate actually applied at payout.
         double allyMod  = session.isAllyBonus() ? allyBonusPercent : 0.0;
-        double leftTax  = left  != null ? mods.getEffectiveTax(left,  allyMod) : 0.0;
-        double rightTax = right != null ? mods.getEffectiveTax(right, allyMod) : 0.0;
+        double leftTax  = left  != null ? ModifierManager.clampRate(mods.getEffectiveTax(left,  allyMod)) : 0.0;
+        double rightTax = right != null ? ModifierManager.clampRate(mods.getEffectiveTax(right, allyMod)) : 0.0;
 
         int leftCount  = countItems(inv, LEFT_ITEM_SLOTS);
         int rightCount = countItems(inv, RIGHT_ITEM_SLOTS);

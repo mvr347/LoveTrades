@@ -41,12 +41,14 @@ public class TradeManager {
     private boolean disabling = false;
 
     private BukkitTask inactivityCheckTask;
+    private final PendingReturnStore pendingReturns;
 
     public TradeManager(LoveTrades plugin, ConfigManager config, ModifierManager modifiers) {
         this.plugin       = plugin;
         this.config       = config;
         this.modifiers    = modifiers;
         this.restrictions = new TradeRestrictions(config);
+        this.pendingReturns = new PendingReturnStore(plugin);
 
         this.inactivityCheckTask = Bukkit.getScheduler().runTaskTimer(plugin, this::checkInactiveSessions, 20L, 20L);
     }
@@ -307,8 +309,8 @@ public class TradeManager {
 
         // Единый налог LoveCore считается по получателю — тот же принцип, что и rightTax/leftTax
         // выше (получатель платит за свою же ставку, не за чужую).
-        List<ItemStack> itemsForRight = applyCoinTax(applyItemTax(leftOffer,  rightTax), right.getUniqueId());
-        List<ItemStack> itemsForLeft  = applyCoinTax(applyItemTax(rightOffer, leftTax),  left.getUniqueId());
+        List<ItemStack> itemsForRight = applyCoinTax(leftOffer,  applyItemTax(leftOffer,  rightTax), right.getUniqueId());
+        List<ItemStack> itemsForLeft  = applyCoinTax(rightOffer, applyItemTax(rightOffer, leftTax),  left.getUniqueId());
 
         // XP levels: left offers xpLeft to right, right offers xpRight to left
         int xpForRight = modifiers.applyXpTax(session.getXpLeft(),  rightTax);
@@ -379,18 +381,11 @@ public class TradeManager {
         List<ItemStack> leftItems  = collectSlots(session.getInventory(), TradeInventory.LEFT_ITEM_SLOTS);
         List<ItemStack> rightItems = collectSlots(session.getInventory(), TradeInventory.RIGHT_ITEM_SLOTS);
 
-        // While the plugin is disabling, a scheduled task is not guaranteed to run at all,
-        // which would silently destroy the items sitting in the trade. Return them directly
-        // in that case instead of going through the scheduler.
-        if (disabling || !plugin.isEnabled()) {
-            returnItems(session.getPlayerLeft(),  leftItems,  left);
-            returnItems(session.getPlayerRight(), rightItems, right);
-        } else {
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                returnItems(session.getPlayerLeft(),  leftItems,  left);
-                returnItems(session.getPlayerRight(), rightItems, right);
-            });
-        }
+        // Return synchronously: a deferred task would run after the player quit/was kicked
+        // and the items would be lost. Offline owners get their items persisted instead.
+        session.getInventory().clear();
+        returnItems(session.getPlayerLeft(),  leftItems,  left);
+        returnItems(session.getPlayerRight(), rightItems, right);
 
         removeSession(session);
         sendCancelMessages(left, right, reason);
@@ -488,6 +483,19 @@ public class TradeManager {
     }
 
     // ── Item change handler ────────────────────────────────────────────────────
+
+    /**
+     * Synchronously drops the other side's ready flag. Must run inside the click handler,
+     * before the change is applied, so the other player can never confirm (or start the
+     * countdown on) an offer they have not seen. Only the info refresh stays deferred.
+     */
+    public void resetOtherReady(TradeSession session, boolean changerIsLeft) {
+        session.touch();
+        if (session.isReadyOf(!changerIsLeft)) {
+            session.setReady(!changerIsLeft, false);
+            TradeInventory.updateStatusSlot(session.getInventory(), !changerIsLeft, false);
+        }
+    }
 
     public void handleItemChange(TradeSession session, boolean changerIsLeft) {
         session.touch();
@@ -704,25 +712,34 @@ public class TradeManager {
      * обычные предметы — только стеки, которые экономика ядра распознаёт как монету. Не
      * изменяет ничего, если LoveCore/TaxOracle/LoveEconomy недоступны.
      */
-    private List<ItemStack> applyCoinTax(List<ItemStack> items, UUID receiverId) {
+    private List<ItemStack> applyCoinTax(List<ItemStack> original, List<ItemStack> taxed, UUID receiverId) {
         var economyOpt = dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.economy.LoveEconomy.class);
         var taxOpt = dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.economy.TaxOracle.class);
         if (economyOpt.isEmpty() || taxOpt.isEmpty()) {
-            return items;
+            return taxed;
         }
         var economy = economyOpt.get();
         var tax = taxOpt.get();
 
+        // Coin tax is computed from the ORIGINAL offered amount (never from an already
+        // modified stack) and can only lower what the item tax left, never raise it.
+        int originalCoins = 0;
+        for (ItemStack item : original) {
+            if (economy.isCoin(item)) originalCoins += item.getAmount();
+        }
+        long allowed = originalCoins > 0 ? tax.applyTradePayout(receiverId, originalCoins) : 0;
+
         List<ItemStack> result = new ArrayList<>();
-        for (ItemStack item : items) {
+        for (ItemStack item : taxed) {
             if (!economy.isCoin(item)) {
                 result.add(item);
                 continue;
             }
-            long newAmount = tax.applyTradePayout(receiverId, item.getAmount());
-            if (newAmount > 0) {
+            int amount = (int) Math.min(item.getAmount(), allowed);
+            allowed -= amount;
+            if (amount > 0) {
                 ItemStack copy = item.clone();
-                copy.setAmount((int) Math.min(newAmount, item.getAmount()));
+                copy.setAmount(amount);
                 result.add(copy);
             }
         }
@@ -749,13 +766,16 @@ public class TradeManager {
             giveItems(player, items);
             return;
         }
-        // Both participants were expected to be resolvable here (completeTrade/cancelTrade only
-        // reach this path with a Player reference fetched moments earlier), but a mass-disconnect
-        // between that lookup and here can still leave nobody to hand the items to. There is no
-        // offline mailbox in this plugin, so previously these items were dropped with zero trace —
-        // log loudly instead of silently vanishing them, so admins can compensate the player.
-        plugin.getLogger().severe(() -> "Не удалось вернуть " + items.size()
-            + " предмет(ов) игроку " + ownerUuid + " — игрок оффлайн, предметы потеряны: " + items);
+        // Owner is offline: persist to the mailbox, delivered on next join.
+        pendingReturns.add(ownerUuid, items);
+        plugin.getLogger().warning(() -> "Игрок " + ownerUuid + " оффлайн, " + items.size()
+            + " предмет(ов) сохранены для выдачи при входе.");
+    }
+
+    /** Delivers items stored for an offline player (called on join). */
+    public void deliverPendingReturns(Player player) {
+        List<ItemStack> items = pendingReturns.take(player.getUniqueId());
+        if (!items.isEmpty()) giveItems(player, items);
     }
 
     /** Deduct XP levels from player, clamped at 0. */
