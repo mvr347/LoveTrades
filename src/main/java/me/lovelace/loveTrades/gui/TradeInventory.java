@@ -46,10 +46,9 @@ public final class TradeInventory {
     private TradeInventory() {}
 
     public static Inventory createInventory(Player left, Player right) {
-        Component title = Component.text("⇆ ")
-            .append(Component.text(left.getName(), NamedTextColor.AQUA))
-            .append(Component.text(" ↔ ", NamedTextColor.GRAY))
-            .append(Component.text(right.getName(), NamedTextColor.GREEN));
+        Component title = Component.text(left.getName(), NamedTextColor.GOLD)
+            .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+            .append(Component.text(right.getName(), NamedTextColor.YELLOW));
         return Bukkit.createInventory(null, 54, title);
     }
 
@@ -85,7 +84,7 @@ public final class TradeInventory {
     /** Switches the separator and status buttons to countdown mode. */
     public static void applyCountdownUI(Inventory inv, int seconds) {
         ItemStack yellow = makePane(Material.YELLOW_STAINED_GLASS_PANE,
-            legacy("&e&lПодтверждение..."));
+            legacy("&eПодтверждение..."));
         for (int s : SEPARATOR_SLOTS) {
             if (s == TIMER_DISPLAY_SLOT) continue;
             inv.setItem(s, yellow);
@@ -94,8 +93,12 @@ public final class TradeInventory {
 
         ItemStack barrier = new ItemStack(Material.BARRIER);
         ItemMeta meta = barrier.getItemMeta();
-        meta.displayName(Component.text("✖ ОТМЕНИТЬ СДЕЛКУ", NamedTextColor.RED)
-            .decorate(TextDecoration.BOLD).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text("Отменить сделку", NamedTextColor.RED)
+            .decoration(TextDecoration.ITALIC, false));
+        List<Component> barrierLore = new ArrayList<>();
+        barrierLore.add(legacy("&8&m─────────────────────"));
+        barrierLore.add(legacy("&cЛКМ &8— &7отменить сделку"));
+        meta.lore(barrierLore);
         barrier.setItemMeta(meta);
         inv.setItem(LEFT_STATUS_SLOT,  barrier);
         inv.setItem(RIGHT_STATUS_SLOT, barrier.clone());
@@ -103,26 +106,36 @@ public final class TradeInventory {
 
     public static void updateTimerDisplay(Inventory inv, int seconds) {
         ItemStack timer = makePane(Material.YELLOW_STAINED_GLASS_PANE,
-            legacy("&e&l" + seconds));
+            legacy("&e" + seconds));
         inv.setItem(TIMER_DISPLAY_SLOT, timer);
     }
 
     public static void updateStatusSlot(Inventory inv, boolean isLeft, boolean ready) {
         int slot = isLeft ? LEFT_STATUS_SLOT : RIGHT_STATUS_SLOT;
         Material mat  = ready ? Material.GREEN_STAINED_GLASS_PANE : Material.RED_STAINED_GLASS_PANE;
-        String  label = ready ? "&a&lГОТОВ" : "&c&lНЕ ГОТОВ";
-        inv.setItem(slot, makePane(mat, legacy(label)));
+        String  label = ready ? "&aГотов" : "&cНе готов";
+        ItemStack item = makePane(mat, legacy(label));
+        ItemMeta meta = item.getItemMeta();
+        List<Component> lore = new ArrayList<>();
+        lore.add(legacy("&8&m─────────────────────"));
+        if (ready) {
+            lore.add(legacy("&aЛКМ &8— &7снять готовность"));
+        } else {
+            lore.add(legacy("&aЛКМ &8— &7подтвердить готовность"));
+        }
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        inv.setItem(slot, item);
     }
 
     public static void updateXpSlot(Inventory inv, boolean isLeft, int amount) {
         int slot = isLeft ? LEFT_XP_SLOT : RIGHT_XP_SLOT;
         ItemStack item = new ItemStack(Material.EXPERIENCE_BOTTLE);
         ItemMeta  meta = item.getItemMeta();
-        meta.displayName(Component.text("✦ Опыт: " + amount + " ур.", NamedTextColor.YELLOW)
-            .decoration(TextDecoration.ITALIC, false));
+        meta.displayName(legacy("&6Опыт: &f" + amount + " ур."));
         List<Component> lore = new ArrayList<>();
-        lore.add(Component.text("Нажмите, чтобы изменить", NamedTextColor.GRAY)
-            .decoration(TextDecoration.ITALIC, false));
+        lore.add(legacy("&8&m─────────────────────"));
+        lore.add(legacy("&aЛКМ &8— &7изменить количество"));
         meta.lore(lore);
         item.setItemMeta(meta);
         inv.setItem(slot, item);
@@ -142,21 +155,19 @@ public final class TradeInventory {
         List<Component> leftLore = new ArrayList<>();
         leftLore.add(legacy("&7Предметов: &f" + leftCount + " ед."));
         leftLore.add(legacy("&7Опыт: &f" + session.getXpLeft() + " ур."));
-        // Not clamped to 0: a negative rate is a real bonus applied at payout (e.g. ally discount
-        // with no other tax) and must be shown as such, not hidden behind a floor of "0%".
         leftLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", rightTax)));
-        if (session.isAllyBonus()) leftLore.add(legacy(String.format("&6⚔ Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
+        if (session.isAllyBonus()) leftLore.add(legacy(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
 
-        ItemStack leftInfo = makeInfoBook(legacy("&6&lВаше предложение"), leftLore);
+        ItemStack leftInfo = makeInfoBook(legacy("&6Ваше предложение"), leftLore);
         for (int s : LEFT_INFO_SLOTS) inv.setItem(s, leftInfo);
 
         List<Component> rightLore = new ArrayList<>();
         rightLore.add(legacy("&7Предметов: &f" + rightCount + " ед."));
         rightLore.add(legacy("&7Опыт: &f" + session.getXpRight() + " ур."));
         rightLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", leftTax)));
-        if (session.isAllyBonus()) rightLore.add(legacy(String.format("&6⚔ Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
+        if (session.isAllyBonus()) rightLore.add(legacy(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
 
-        ItemStack rightInfo = makeInfoBook(legacy("&6&lПредложение партнёра"), rightLore);
+        ItemStack rightInfo = makeInfoBook(legacy("&6Предложение партнёра"), rightLore);
         for (int s : RIGHT_INFO_SLOTS) inv.setItem(s, rightInfo);
     }
 
