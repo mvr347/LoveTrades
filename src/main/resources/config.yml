@@ -81,7 +81,6 @@ messages:
   cannot-self: "&cНельзя торговать с самим собой."
   player-offline: "&cИгрок &e{player} &cне в сети."
   player-not-found: "&cИгрок &e{player} &cне найден."
-  no-permission: "&cУ вас нет прав для этого действия."
   no-pending-request: "&cНет запроса на торговлю от &e{player}&c."
   xp-enter-amount: "&eВведите количество уровней опыта для передачи (0 — убрать):"
   xp-set: "&aУстановлено &e{amount} &aур. опыта для передачи."

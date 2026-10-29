@@ -16,11 +16,13 @@ commands:
     aliases: [ lovetrades, торговля ]
     usage: "/trade <игрок|accept|deny|toggle>"
     permission: lovetrades.use
+    permission-message: ""
   lovetradesadmin:
     description: "Административные команды торговли"
     aliases: [ tradeadmin ]
     usage: "/lovetradesadmin <reload|modifier>"
     permission: lovetrades.admin
+    permission-message: ""
 
 permissions:
   lovetrades.use:
