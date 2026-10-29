@@ -37,8 +37,8 @@ public class TradeAdminCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
+        // Silent on purpose: a command the sender cannot use is simply not theirs.
         if (!sender.hasPermission("lovetrades.admin")) {
-            sender.sendMessage(legacy(config.getMessage("no-permission", "&cУ вас нет прав для этого действия.")));
             return true;
         }
 

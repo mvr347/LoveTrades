@@ -37,7 +37,6 @@ public class TradeCommand implements CommandExecutor, TabCompleter {
         }
 
         if (!player.hasPermission("lovetrades.use")) {
-            player.sendMessage(legacy(config.getMessage("no-permission")));
             return true;
         }
 
