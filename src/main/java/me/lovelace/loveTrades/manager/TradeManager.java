@@ -341,10 +341,42 @@ public class TradeManager {
 
         left.sendMessage(msg("trade-complete", "", ""));
         right.sendMessage(msg("trade-complete", "", ""));
+        pointlessButFair(left, right, leftOffer, rightOffer, session);
 
         Bukkit.getPluginManager().callEvent(new TradeCompleteEvent(session));
         reportTradeToCore(session.getPlayerLeft());
         reportTradeToCore(session.getPlayerRight());
+    }
+
+    /** Easter egg: both sides gave the same things; says so and records the find in the book of secrets. */
+    private void pointlessButFair(Player left, Player right, List<ItemStack> leftOffer, List<ItemStack> rightOffer,
+                                  TradeSession session) {
+        if (!plugin.getConfig().getBoolean("easter-eggs.same-for-same", true)) return;
+        if (!TradeRules.identicalSwap(group(leftOffer), group(rightOffer), session.getXpLeft(), session.getXpRight())) {
+            return;
+        }
+        Component line = legacy(config.getMessage("same-for-same", "&7Это было… бессмысленно, но честно."));
+        left.sendMessage(line);
+        right.sendMessage(line);
+        if (Bukkit.getPluginManager().getPlugin("LoveCore") == null) return;
+        try {
+            for (UUID id : new UUID[] {left.getUniqueId(), right.getUniqueId()}) {
+                dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.secrets.SecretBook.class)
+                        .ifPresent(book -> book.discover(id, "same_for_same"));
+            }
+        } catch (Throwable t) {
+            // An older LoveCore has no book of secrets: the message above is all there is.
+        }
+    }
+
+    /** Kind of item (one piece, amount ignored) to the total offered, whatever the stacks look like. */
+    private static Map<ItemStack, Integer> group(List<ItemStack> offer) {
+        Map<ItemStack, Integer> totals = new HashMap<>();
+        for (ItemStack stack : offer) {
+            if (stack == null || stack.getType().isAir()) continue;
+            totals.merge(stack.asOne(), stack.getAmount(), Integer::sum);
+        }
+        return totals;
     }
 
     /**
