@@ -327,6 +327,12 @@ public class TradeManager {
 
         closeInventoriesProgrammatically(session, left, right);
 
+        // Counted before delivery: Inventory#addItem shrinks the very stacks it is handed while merging them
+        long leftGave = amount(leftOffer);
+        long rightGave = amount(rightOffer);
+        long leftGot = amount(preEvent.getItemsForLeft());
+        long rightGot = amount(preEvent.getItemsForRight());
+
         giveItems(left,  preEvent.getItemsForLeft());
         giveItems(right, preEvent.getItemsForRight());
 
@@ -337,7 +343,7 @@ public class TradeManager {
         right.giveExpLevels(preEvent.getXpForRight());
 
         restrictions.recordCompletedTrade(session.getPlayerLeft(), session.getPlayerRight());
-        recordStats(session, leftOffer, rightOffer, preEvent.getItemsForLeft(), preEvent.getItemsForRight());
+        recordStats(session, leftGave, rightGave, leftGot, rightGot);
         removeSession(session);
 
         left.sendMessage(msg("trade-complete", "", ""));
@@ -350,12 +356,9 @@ public class TradeManager {
     }
 
     /** Counts the finished trade for both sides: what each gave, what reached the other, what the tax took. */
-    private void recordStats(TradeSession session, List<ItemStack> leftOffer, List<ItemStack> rightOffer,
-                             List<ItemStack> itemsForLeft, List<ItemStack> itemsForRight) {
-        long leftGave = amount(leftOffer);
-        long rightGave = amount(rightOffer);
-        plugin.getTradeStats().record(session.getPlayerLeft(), session.getPlayerRight(), leftGave, rightGave, amount(itemsForLeft));
-        plugin.getTradeStats().record(session.getPlayerRight(), session.getPlayerLeft(), rightGave, leftGave, amount(itemsForRight));
+    private void recordStats(TradeSession session, long leftGave, long rightGave, long leftGot, long rightGot) {
+        plugin.getTradeStats().record(session.getPlayerLeft(), session.getPlayerRight(), leftGave, rightGave, leftGot);
+        plugin.getTradeStats().record(session.getPlayerRight(), session.getPlayerLeft(), rightGave, leftGave, rightGot);
     }
 
     private static long amount(List<ItemStack> stacks) {
