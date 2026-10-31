@@ -337,6 +337,7 @@ public class TradeManager {
         right.giveExpLevels(preEvent.getXpForRight());
 
         restrictions.recordCompletedTrade(session.getPlayerLeft(), session.getPlayerRight());
+        recordStats(session, leftOffer, rightOffer, preEvent.getItemsForLeft(), preEvent.getItemsForRight());
         removeSession(session);
 
         left.sendMessage(msg("trade-complete", "", ""));
@@ -346,6 +347,23 @@ public class TradeManager {
         Bukkit.getPluginManager().callEvent(new TradeCompleteEvent(session));
         reportTradeToCore(session.getPlayerLeft());
         reportTradeToCore(session.getPlayerRight());
+    }
+
+    /** Counts the finished trade for both sides: what each gave, what reached the other, what the tax took. */
+    private void recordStats(TradeSession session, List<ItemStack> leftOffer, List<ItemStack> rightOffer,
+                             List<ItemStack> itemsForLeft, List<ItemStack> itemsForRight) {
+        long leftGave = amount(leftOffer);
+        long rightGave = amount(rightOffer);
+        plugin.getTradeStats().record(session.getPlayerLeft(), session.getPlayerRight(), leftGave, rightGave, amount(itemsForLeft));
+        plugin.getTradeStats().record(session.getPlayerRight(), session.getPlayerLeft(), rightGave, leftGave, amount(itemsForRight));
+    }
+
+    private static long amount(List<ItemStack> stacks) {
+        long total = 0;
+        for (ItemStack stack : stacks) {
+            if (stack != null && !stack.getType().isAir()) total += stack.getAmount();
+        }
+        return total;
     }
 
     /** Easter egg: both sides gave the same things; says so and records the find in the book of secrets. */

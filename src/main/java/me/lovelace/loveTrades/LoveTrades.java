@@ -9,6 +9,7 @@ import me.lovelace.loveTrades.listener.XpInputListener;
 import me.lovelace.loveTrades.manager.ConfigManager;
 import me.lovelace.loveTrades.manager.ModifierManager;
 import me.lovelace.loveTrades.manager.TradeManager;
+import me.lovelace.loveTrades.manager.TradeStats;
 import me.lovelace.loveTrades.placeholder.TradePlaceholderExpansion;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -18,10 +19,17 @@ public final class LoveTrades extends JavaPlugin {
     private ConfigManager configManager;
     private ModifierManager modifierManager;
     private TradeManager tradeManager;
+    private final TradeStats tradeStats = new TradeStats();
+    private java.io.File statsFile;
     private ClanIntegration clanIntegration;
 
     @Override
     public void onEnable() {
+        statsFile = new java.io.File(getDataFolder(), "data/stats.yml");
+        tradeStats.load(statsFile);
+        // Counters live in memory; the file is rewritten in the background when they changed.
+        getServer().getScheduler().runTaskTimerAsynchronously(this, this::saveStats, 20L * 300, 20L * 300);
+
         configManager   = new ConfigManager(this);
         modifierManager = new ModifierManager(this, configManager);
         tradeManager    = new TradeManager(this, configManager, modifierManager);
@@ -48,7 +56,7 @@ public final class LoveTrades extends JavaPlugin {
         pm.registerEvents(new XpInputListener(tradeManager, this), this);
 
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            new TradePlaceholderExpansion(this, modifierManager).register();
+            new TradePlaceholderExpansion(this, modifierManager, tradeStats).register();
             getLogger().info("PlaceholderAPI expansion зарегистрирован.");
         }
 
@@ -59,6 +67,7 @@ public final class LoveTrades extends JavaPlugin {
     public void onDisable() {
         if (tradeManager != null) tradeManager.onDisable();
         if (modifierManager != null) modifierManager.savePlayersData();
+        saveStats();
         getLogger().info("LoveTrades выключён.");
     }
 
@@ -79,6 +88,16 @@ public final class LoveTrades extends JavaPlugin {
     }
 
     public ClanIntegration getClanIntegration() { return clanIntegration; }
+
+    public TradeStats getTradeStats() { return tradeStats; }
+
+    private void saveStats() {
+        try {
+            tradeStats.saveIfDirty(statsFile);
+        } catch (java.io.IOException e) {
+            getLogger().warning("Не удалось сохранить stats.yml: " + e.getMessage());
+        }
+    }
 
     public ConfigManager getConfigManager()     { return configManager; }
     public ModifierManager getModifierManager() { return modifierManager; }
