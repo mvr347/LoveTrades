@@ -12,10 +12,12 @@ public class ConfigManager {
     public ConfigManager(LoveTrades plugin) {
         this.plugin = plugin;
         plugin.saveDefaultConfig();
+        me.lovelace.loveTrades.gui.TradeHeads.configure(plugin.getConfig().getConfigurationSection("heads"));
     }
 
     public void reload() {
         plugin.reloadConfig();
+        me.lovelace.loveTrades.gui.TradeHeads.configure(plugin.getConfig().getConfigurationSection("heads"));
     }
 
     public int getRequestTimeout() {
@@ -41,6 +43,16 @@ public class ConfigManager {
 
     public int getPairCooldownSeconds() {
         return plugin.getConfig().getInt("restrictions.pair-cooldown-seconds", 180);
+    }
+
+    /** Most experience levels one side may offer; 0 or less means only the player's own levels limit it. */
+    public int getMaxXpLevelsPerSide() {
+        return plugin.getConfig().getInt("restrictions.max-xp-levels-per-side", 0);
+    }
+
+    /** Levels added or removed by a Shift-click on the XP button. */
+    public int getXpShiftStep() {
+        return Math.max(1, plugin.getConfig().getInt("settings.xp-shift-step", 5));
     }
 
     public int getMaxStacksPerSide() {

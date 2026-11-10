@@ -107,7 +107,8 @@ public class TradeInventoryListener implements Listener {
 
         if (rawSlot == myXp) {
             e.setCancelled(true);
-            tradeManager.beginXpInput(player, session);
+            int delta = xpDelta(e.getClick(), tradeManager.xpShiftStep());
+            if (delta != 0) tradeManager.adjustXp(player, session, delta);
             return;
         }
 
@@ -174,11 +175,19 @@ public class TradeInventoryListener implements Listener {
             }
         }
 
-        // Clear XP input if pending
-        tradeManager.cancelXpInput(player.getUniqueId());
-
         tradeManager.cancelTrade(session,
             me.lovelace.loveTrades.api.events.TradeCancelEvent.Reason.PLAYER_CLOSED);
+    }
+
+    /** Levels changed by a click on the XP button: LMB -1, RMB +1, Shift the configured step; any other click does nothing. */
+    public static int xpDelta(org.bukkit.event.inventory.ClickType click, int shiftStep) {
+        return switch (click) {
+            case LEFT -> -1;
+            case RIGHT -> 1;
+            case SHIFT_LEFT -> -shiftStep;
+            case SHIFT_RIGHT -> shiftStep;
+            default -> 0;
+        };
     }
 
     // ── Shift-click redirect from player inventory to own trade slots ─────────

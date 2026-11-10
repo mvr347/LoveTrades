@@ -43,7 +43,16 @@ public final class TradeInventory {
     private static final Set<Integer> RIGHT_SET = toSet(RIGHT_ITEM_SLOTS);
     private static final Set<Integer> SEP_SET   = toSet(SEPARATOR_SLOTS);
 
+    private static volatile int xpMaxPerSide = 0;
+    private static volatile int xpShiftStep = 5;
+
     private TradeInventory() {}
+
+    /** Limits shown on the XP button; refreshed by the manager at the start of every trade. */
+    public static void configureXp(int maxPerSide, int shiftStep) {
+        xpMaxPerSide = maxPerSide;
+        xpShiftStep = Math.max(1, shiftStep);
+    }
 
     public static Inventory createInventory(Player left, Player right) {
         Component title = Component.text(left.getName(), NamedTextColor.GOLD)
@@ -63,8 +72,8 @@ public final class TradeInventory {
 
         updateStatusSlot(inv, true,  false);
         updateStatusSlot(inv, false, false);
-        updateXpSlot(inv, true,  0);
-        updateXpSlot(inv, false, 0);
+        updateXpSlot(inv, true,  0, left  != null ? left.getLevel()  : 0);
+        updateXpSlot(inv, false, 0, right != null ? right.getLevel() : 0);
         refreshInfoSlots(inv, session, left, right, mods, allyBonusPercent);
     }
 
@@ -76,8 +85,8 @@ public final class TradeInventory {
 
         updateStatusSlot(inv, true,  false);
         updateStatusSlot(inv, false, false);
-        updateXpSlot(inv, true,  session.getXpLeft());
-        updateXpSlot(inv, false, session.getXpRight());
+        updateXpSlot(inv, true,  session.getXpLeft(),  left  != null ? left.getLevel()  : 0);
+        updateXpSlot(inv, false, session.getXpRight(), right != null ? right.getLevel() : 0);
         refreshInfoSlots(inv, session, left, right, mods, allyBonusPercent);
     }
 
@@ -91,15 +100,9 @@ public final class TradeInventory {
         }
         updateTimerDisplay(inv, seconds);
 
-        ItemStack barrier = new ItemStack(Material.BARRIER);
-        ItemMeta meta = barrier.getItemMeta();
-        meta.displayName(Component.text("Отменить сделку", NamedTextColor.RED)
-            .decoration(TextDecoration.ITALIC, false));
-        List<Component> barrierLore = new ArrayList<>();
-        barrierLore.add(legacy("&8&m─────────────────────"));
-        barrierLore.add(legacy("&cЛКМ &8— &7отменить сделку"));
-        meta.lore(barrierLore);
-        barrier.setItemMeta(meta);
+        ItemStack barrier = TradeHeads.head(TradeHeads.CANCEL, "&cОтменить сделку", List.of(
+            "&8&m─────────────────────",
+            "&cЛКМ &8— &7отменить сделку"));
         inv.setItem(LEFT_STATUS_SLOT,  barrier);
         inv.setItem(RIGHT_STATUS_SLOT, barrier.clone());
     }
@@ -112,33 +115,48 @@ public final class TradeInventory {
 
     public static void updateStatusSlot(Inventory inv, boolean isLeft, boolean ready) {
         int slot = isLeft ? LEFT_STATUS_SLOT : RIGHT_STATUS_SLOT;
-        Material mat  = ready ? Material.GREEN_STAINED_GLASS_PANE : Material.RED_STAINED_GLASS_PANE;
-        String  label = ready ? "&aГотов" : "&cНе готов";
-        ItemStack item = makePane(mat, legacy(label));
-        ItemMeta meta = item.getItemMeta();
-        List<Component> lore = new ArrayList<>();
-        lore.add(legacy("&8&m─────────────────────"));
-        if (ready) {
-            lore.add(legacy("&aЛКМ &8— &7снять готовность"));
-        } else {
-            lore.add(legacy("&aЛКМ &8— &7подтвердить готовность"));
-        }
-        meta.lore(lore);
-        item.setItemMeta(meta);
-        inv.setItem(slot, item);
+        List<String> lore = List.of(
+            "&8&m─────────────────────",
+            ready ? "&aЛКМ &8— &7снять готовность" : "&aЛКМ &8— &7подтвердить готовность");
+        inv.setItem(slot, ready
+            ? TradeHeads.head(TradeHeads.READY, "&aГотов", lore)
+            : TradeHeads.head(TradeHeads.NOT_READY, "&cНе готов", lore));
     }
 
-    public static void updateXpSlot(Inventory inv, boolean isLeft, int amount) {
+    /**
+     * The XP button: LMB takes a level off the offer, RMB adds one, Shift changes it by the configured step.
+     * {@code available} is what the player owns right now; a click that would do nothing is shown as blocked with its reason.
+     */
+    public static void updateXpSlot(Inventory inv, boolean isLeft, int amount, int available) {
         int slot = isLeft ? LEFT_XP_SLOT : RIGHT_XP_SLOT;
-        ItemStack item = new ItemStack(Material.EXPERIENCE_BOTTLE);
-        ItemMeta  meta = item.getItemMeta();
-        meta.displayName(legacy("&6Опыт: &f" + amount + " ур."));
-        List<Component> lore = new ArrayList<>();
-        lore.add(legacy("&8&m─────────────────────"));
-        lore.add(legacy("&aЛКМ &8— &7изменить количество"));
-        meta.lore(lore);
-        item.setItemMeta(meta);
-        inv.setItem(slot, item);
+        int cap = me.lovelace.loveTrades.manager.TradeRules.xpOfferCap(available, xpMaxPerSide);
+        inv.setItem(slot, TradeHeads.head(TradeHeads.XP, "&6Опыт: &f" + amount + " ур.",
+            xpLore(amount, available, cap, xpShiftStep)));
+    }
+
+    /** Lore of the XP button; separate and pure so the layout can be tested without a server. */
+    public static List<String> xpLore(int amount, int available, int cap, int step) {
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Доступно уровней: &f" + available);
+        lore.add("&7Можно предложить: &f" + cap);
+        lore.add("&8&m─────────────────────");
+        boolean canLess = amount > 0;
+        boolean canMore = amount < cap;
+        if (!canLess && !canMore) {
+            lore.add("&c✕ Действие недоступно");
+            lore.add("&cПричина: &7" + (cap == 0 ? "нет уровней опыта" : "предложение нельзя изменить"));
+        }
+        lore.add(clickLine("&aЛКМ", "−1 ур.", canLess));
+        lore.add(clickLine("&6ПКМ", "+1 ур.", canMore));
+        lore.add(clickLine("&eShift+ЛКМ", "−" + step + " ур.", canLess));
+        lore.add(clickLine("&eShift+ПКМ", "+" + step + " ур.", canMore));
+        return lore;
+    }
+
+    private static String clickLine(String coloredKey, String action, boolean active) {
+        if (active) return coloredKey + " &8— &7" + action;
+        String plainKey = coloredKey.replaceAll("&[0-9a-fk-or]", "");
+        return "&8" + plainKey + " — " + action + " (заблокировано)";
     }
 
     public static void refreshInfoSlots(Inventory inv, TradeSession session,
@@ -152,22 +170,24 @@ public final class TradeInventory {
         int leftCount  = countItems(inv, LEFT_ITEM_SLOTS);
         int rightCount = countItems(inv, RIGHT_ITEM_SLOTS);
 
-        List<Component> leftLore = new ArrayList<>();
-        leftLore.add(legacy("&7Предметов: &f" + leftCount + " ед."));
-        leftLore.add(legacy("&7Опыт: &f" + session.getXpLeft() + " ур."));
-        leftLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", rightTax)));
-        if (session.isAllyBonus()) leftLore.add(legacy(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
+        List<String> leftLore = new ArrayList<>();
+        leftLore.add("&7Предметов: &f" + leftCount + " ед.");
+        leftLore.add("&7Опыт: &f" + session.getXpLeft() + " ур.");
+        leftLore.add("&7Партнёр получит: &f" + ModifierManager.applyXpTax(session.getXpLeft(), rightTax) + " ур.");
+        leftLore.add("&7Налог получателя: &c" + String.format("%.1f%%", rightTax));
+        if (session.isAllyBonus()) leftLore.add(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent));
 
-        ItemStack leftInfo = makeInfoBook(legacy("&6Ваше предложение"), leftLore);
+        ItemStack leftInfo = makeInfoBook("&6Ваше предложение", leftLore);
         for (int s : LEFT_INFO_SLOTS) inv.setItem(s, leftInfo);
 
-        List<Component> rightLore = new ArrayList<>();
-        rightLore.add(legacy("&7Предметов: &f" + rightCount + " ед."));
-        rightLore.add(legacy("&7Опыт: &f" + session.getXpRight() + " ур."));
-        rightLore.add(legacy("&7Налог получателя: &c" + String.format("%.1f%%", leftTax)));
-        if (session.isAllyBonus()) rightLore.add(legacy(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent)));
+        List<String> rightLore = new ArrayList<>();
+        rightLore.add("&7Предметов: &f" + rightCount + " ед.");
+        rightLore.add("&7Опыт: &f" + session.getXpRight() + " ур.");
+        rightLore.add("&7Вы получите: &f" + ModifierManager.applyXpTax(session.getXpRight(), leftTax) + " ур.");
+        rightLore.add("&7Налог получателя: &c" + String.format("%.1f%%", leftTax));
+        if (session.isAllyBonus()) rightLore.add(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent));
 
-        ItemStack rightInfo = makeInfoBook(legacy("&6Предложение партнёра"), rightLore);
+        ItemStack rightInfo = makeInfoBook("&6Предложение партнёра", rightLore);
         for (int s : RIGHT_INFO_SLOTS) inv.setItem(s, rightInfo);
     }
 
@@ -197,18 +217,8 @@ public final class TradeInventory {
         return item;
     }
 
-    private static ItemStack makeInfoBook(Component title, List<Component> lore) {
-        ItemStack item = new ItemStack(Material.BOOK);
-        ItemMeta  meta = item.getItemMeta();
-        meta.displayName(title.decoration(TextDecoration.ITALIC, false));
-        List<Component> loreWithNoItalic = new ArrayList<>();
-        for (Component line : lore) {
-            loreWithNoItalic.add(line.decoration(TextDecoration.ITALIC, false));
-        }
-        meta.lore(loreWithNoItalic);
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        item.setItemMeta(meta);
-        return item;
+    private static ItemStack makeInfoBook(String title, List<String> lore) {
+        return TradeHeads.head(TradeHeads.INFO, title, lore);
     }
 
     private static Component legacy(String s) {
