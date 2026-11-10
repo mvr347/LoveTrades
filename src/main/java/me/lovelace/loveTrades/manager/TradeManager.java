@@ -4,7 +4,6 @@ import me.lovelace.loveTrades.LoveTrades;
 import me.lovelace.loveTrades.api.ClanIntegration;
 import me.lovelace.loveTrades.api.events.*;
 import me.lovelace.loveTrades.gui.TradeInventory;
-import me.lovelace.loveTrades.gui.XpInputSession;
 import me.lovelace.loveTrades.trade.TradeRequest;
 import me.lovelace.loveTrades.trade.TradeSession;
 import me.lovelace.loveTrades.trade.TradeState;
@@ -29,7 +28,6 @@ public class TradeManager {
 
     private final Map<UUID, TradeSession>   activeSessions    = new ConcurrentHashMap<>();
     private final Map<UUID, TradeRequest>   pendingRequests   = new ConcurrentHashMap<>();
-    private final Map<UUID, XpInputSession> xpInputSessions   = new ConcurrentHashMap<>();
 
     // UUIDs whose next InventoryCloseEvent should be ignored (programmatic close)
     private final Set<UUID> programmaticCloseSet = new HashSet<>();
@@ -60,7 +58,6 @@ public class TradeManager {
     public boolean isInSession(UUID uuid)         { return activeSessions.containsKey(uuid); }
     public boolean hasPendingRequest(UUID uuid)   { return pendingRequests.containsKey(uuid); }
     public TradeSession getSession(UUID uuid)     { return activeSessions.get(uuid); }
-    public XpInputSession getXpInput(UUID uuid)   { return xpInputSessions.get(uuid); }
     public boolean isProgrammaticClose(UUID uuid) { return programmaticCloseSet.remove(uuid); }
 
     // ── Request flow ───────────────────────────────────────────────────────────
@@ -186,6 +183,7 @@ public class TradeManager {
         activeSessions.put(left.getUniqueId(),  session);
         activeSessions.put(right.getUniqueId(), session);
 
+        TradeInventory.configureXp(config.getMaxXpLevelsPerSide(), config.getXpShiftStep());
         TradeInventory.initLayout(inv, session, left, right, modifiers, config.getClanAllyBonus());
 
         Bukkit.getPluginManager().callEvent(new TradeStartEvent(left, right, session));
@@ -260,8 +258,8 @@ public class TradeManager {
     }
 
     private void completeTrade(TradeSession session) {
-        session.setState(TradeState.COMPLETED);
-
+        // The state turns COMPLETED only after every check below has passed: cancelTrade() ignores a COMPLETED session, so
+        // marking it first made each failed check a silent no-op that left the window open and both players stuck in the trade.
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
 
@@ -325,6 +323,13 @@ public class TradeManager {
             return;
         }
 
+        // Plugins listening to the pre-complete event ran in between: re-check the levels once more right before taking them.
+        if (left.getLevel() < session.getXpLeft() || right.getLevel() < session.getXpRight()) {
+            cancelTrade(session, TradeCancelEvent.Reason.INSUFFICIENT_XP);
+            return;
+        }
+
+        session.setState(TradeState.COMPLETED);
         closeInventoriesProgrammatically(session, left, right);
 
         // Counted before delivery: Inventory#addItem shrinks the very stacks it is handed while merging them
@@ -475,64 +480,50 @@ public class TradeManager {
         }
     }
 
-    // ── XP input ──────────────────────────────────────────────────────────────
-
-    public void beginXpInput(Player player, TradeSession session) {
-        xpInputSessions.put(player.getUniqueId(), new XpInputSession(player.getUniqueId(), session));
-        player.sendMessage(msg("xp-enter-amount", "", ""));
+    /** Levels a Shift-click on the XP button changes the offer by. */
+    public int xpShiftStep() {
+        return config.getXpShiftStep();
     }
 
-    public void processXpInput(Player player, String input) {
-        XpInputSession xpSession = xpInputSessions.get(player.getUniqueId());
-        if (xpSession == null) return;
+    // ── XP offer button ───────────────────────────────────────────────────────
 
-        TradeSession session = xpSession.getSession();
-        if (session.getState() != TradeState.ACTIVE) {
-            xpInputSessions.remove(player.getUniqueId());
-            return;
-        }
-
-        int amount;
-        try {
-            amount = Integer.parseInt(input.trim());
-            if (amount < 0) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            player.sendMessage(msg("xp-invalid", "", ""));
-            return;
-        }
-
-        // XP amounts are in levels
-        int available = player.getLevel();
-        if (amount > available) {
-            player.sendMessage(msg("xp-not-enough", "{available}", String.valueOf(available)));
-            return;
-        }
-
-        xpInputSessions.remove(player.getUniqueId());
-        session.touch();
+    /**
+     * A click on the XP button: {@code delta} levels are added to (or taken off) the player's offer. Levels are only taken at
+     * completion, so nothing needs refunding on cancel; the amount is re-validated then. Changing the offer unconfirms BOTH
+     * sides, so nobody can confirm an offer that has just changed under them.
+     */
+    public void adjustXp(Player player, TradeSession session, int delta) {
+        if (session.getState() != TradeState.ACTIVE || delta == 0) return;
 
         boolean isLeft = session.isLeftPlayer(player.getUniqueId());
-        if (isLeft) session.setXpLeft(amount);
-        else        session.setXpRight(amount);
+        int current = isLeft ? session.getXpLeft() : session.getXpRight();
+        int maxPerSide = config.getMaxXpLevelsPerSide();
+        int cap = TradeRules.xpOfferCap(player.getLevel(), maxPerSide);
+        int next = TradeRules.nextXpOffer(current, delta, player.getLevel(), maxPerSide);
 
-        // Reset other player's ready state since the offer changed
-        boolean otherWasReady = session.isReadyOf(!isLeft);
-        if (otherWasReady) {
-            session.setReady(!isLeft, false);
-            TradeInventory.updateStatusSlot(session.getInventory(), !isLeft, false);
+        if (next == current) {
+            player.sendMessage(delta > 0
+                ? legacy(config.getMessage("xp-max-reached", "&cБольше предложить нельзя: предел &e{limit} &cур. опыта.")
+                    .replace("{limit}", String.valueOf(cap)))
+                : legacy(config.getMessage("xp-min-reached", "&cОпыт в предложении уже 0.")));
+            return;
         }
 
-        TradeInventory.updateXpSlot(session.getInventory(), isLeft, amount);
+        session.touch();
+        if (isLeft) session.setXpLeft(next);
+        else        session.setXpRight(next);
+
+        for (boolean side : new boolean[] {true, false}) {
+            if (session.isReadyOf(side)) {
+                session.setReady(side, false);
+                TradeInventory.updateStatusSlot(session.getInventory(), side, false);
+            }
+        }
 
         Player left  = Bukkit.getPlayer(session.getPlayerLeft());
         Player right = Bukkit.getPlayer(session.getPlayerRight());
+        TradeInventory.updateXpSlot(session.getInventory(), isLeft, next, player.getLevel());
         TradeInventory.refreshInfoSlots(session.getInventory(), session, left, right, modifiers, config.getClanAllyBonus());
-
-        player.sendMessage(msg("xp-set", "{amount}", String.valueOf(amount)));
-    }
-
-    public void cancelXpInput(UUID uuid) {
-        xpInputSessions.remove(uuid);
     }
 
     // ── Item change handler ────────────────────────────────────────────────────
@@ -651,8 +642,6 @@ public class TradeManager {
 
     public void onPlayerQuit(Player player) {
         UUID uuid = player.getUniqueId();
-        xpInputSessions.remove(uuid);
-
         // Clean up a request where the quitting player is the receiver
         TradeRequest asReceiver = pendingRequests.remove(uuid);
         if (asReceiver != null) asReceiver.cancelExpiryTask();
@@ -696,7 +685,6 @@ public class TradeManager {
         }
         activeSessions.clear();
         pendingRequests.clear();
-        xpInputSessions.clear();
         stackLimitWarned.clear();
     }
 

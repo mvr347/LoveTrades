@@ -5,7 +5,6 @@ import me.lovelace.loveTrades.command.TradeAdminCommand;
 import me.lovelace.loveTrades.command.TradeCommand;
 import me.lovelace.loveTrades.listener.PlayerProtectionListener;
 import me.lovelace.loveTrades.listener.TradeInventoryListener;
-import me.lovelace.loveTrades.listener.XpInputListener;
 import me.lovelace.loveTrades.manager.ConfigManager;
 import me.lovelace.loveTrades.manager.ModifierManager;
 import me.lovelace.loveTrades.manager.TradeManager;
@@ -53,7 +52,6 @@ public final class LoveTrades extends JavaPlugin {
                 tradeManager.deliverPendingReturns(e.getPlayer());
             }
         }, this);
-        pm.registerEvents(new XpInputListener(tradeManager, this), this);
 
         if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             new TradePlaceholderExpansion(this, modifierManager, tradeStats).register();

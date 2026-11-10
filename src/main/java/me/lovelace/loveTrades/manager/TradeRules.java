@@ -17,4 +17,21 @@ public final class TradeRules {
         if (xpLeft != 0 || xpRight != 0) return false;
         return left.equals(right);
     }
+
+    /**
+     * New experience offer (in levels) after a click on the XP button. The offer never goes below 0 and never above what the
+     * player owns right now ({@code available}) or the configured per-side maximum ({@code maxPerSide}, 0 or less = no extra cap).
+     */
+    public static int nextXpOffer(int current, int delta, int available, int maxPerSide) {
+        int cap = Math.max(0, available);
+        if (maxPerSide > 0) cap = Math.min(cap, maxPerSide);
+        long next = (long) current + delta;
+        return (int) Math.max(0, Math.min(cap, next));
+    }
+
+    /** The most levels the player can offer: what they own, limited by the configured maximum (0 or less = no cap). */
+    public static int xpOfferCap(int available, int maxPerSide) {
+        int cap = Math.max(0, available);
+        return maxPerSide > 0 ? Math.min(cap, maxPerSide) : cap;
+    }
 }
