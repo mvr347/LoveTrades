@@ -68,4 +68,20 @@ class XpButtonTest {
         }
         assertEquals(5, TradeHeads.DEFAULT_HASHES.size());
     }
+
+    @org.junit.jupiter.api.Test
+    void xpButtonStackFollowsOfferedLevels() {
+        org.junit.jupiter.api.Assertions.assertEquals(1, TradeInventory.xpStackAmount(0));
+        org.junit.jupiter.api.Assertions.assertEquals(1, TradeInventory.xpStackAmount(1));
+        org.junit.jupiter.api.Assertions.assertEquals(2, TradeInventory.xpStackAmount(2));
+        org.junit.jupiter.api.Assertions.assertEquals(64, TradeInventory.xpStackAmount(500));
+    }
+
+    @org.junit.jupiter.api.Test
+    void unlockedZonePrefix() {
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[]{0, 1, 2, 3},
+            TradeInventory.unlocked(TradeInventory.LEFT_ITEM_SLOTS, 4));
+        org.junit.jupiter.api.Assertions.assertEquals(9, TradeInventory.unlocked(TradeInventory.RIGHT_ITEM_SLOTS, 9).length);
+        org.junit.jupiter.api.Assertions.assertEquals(16, TradeInventory.unlocked(TradeInventory.RIGHT_ITEM_SLOTS, 50).length);
+    }
 }

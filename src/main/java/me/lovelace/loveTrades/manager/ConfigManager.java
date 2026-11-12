@@ -50,6 +50,13 @@ public class ConfigManager {
         return plugin.getConfig().getInt("restrictions.max-xp-levels-per-side", 0);
     }
 
+    /** Item slots per side for politeness steps 0..6; empty or invalid = the built-in table. */
+    public int[] getTradeSlotsByPoliteness() {
+        List<Integer> list = plugin.getConfig().getIntegerList("restrictions.trade-slots-by-politeness");
+        if (list.isEmpty()) return me.lovelace.loveTrades.manager.TradeRules.DEFAULT_SLOTS_BY_POLITENESS;
+        return list.stream().mapToInt(Integer::intValue).toArray();
+    }
+
     /** Levels added or removed by a Shift-click on the XP button. */
     public int getXpShiftStep() {
         return Math.max(1, plugin.getConfig().getInt("settings.xp-shift-step", 5));

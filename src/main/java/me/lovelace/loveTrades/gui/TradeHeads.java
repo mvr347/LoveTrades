@@ -41,11 +41,11 @@ public final class TradeHeads {
 
     private static Map<String, String> defaults() {
         Map<String, String> m = new LinkedHashMap<>();
-        m.put(READY, "a92e31ffb551c0110e96ea2d65fa3a5ff699f5923d318e5f128e1f9b5e76e");
-        m.put(NOT_READY, "beb588b35d3c8008a2879509b23b361a603b5193952f4c40974f07a4aab47a");
+        m.put(READY, "930f4537d214d38666e6304e9c851cd6f7e41a0eb7c25049c9d22c8c5f6545df");
+        m.put(NOT_READY, "5a6787ba32564e7c2f3a0ce64498ecbb23b89845e5a66b5cec7736f729ed37");
         m.put(CANCEL, "afd2400002ad9fbbbd0066941eb5b1a384ab9b0e48a178ee96e4d129a5208654");
         m.put(XP, "48b81d8935fc101e35f3e54f537b612822f18faf752a90037cc4215a5dc881ef");
-        m.put(INFO, "f80d3295d3d9abd62776abcb8da756f298a545fee9498c4f69a1c2c78524c824");
+        m.put(INFO, "4cb3acdc11ca747bf710e59f4c8e9b3d949fdd364c6869831ca878f0763d1787");
         return java.util.Collections.unmodifiableMap(m);
     }
 

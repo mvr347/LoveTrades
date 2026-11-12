@@ -82,8 +82,7 @@ public class TradeInventoryListener implements Listener {
         }
 
         // ACTIVE state
-        boolean inMySlots = isLeft ? TradeInventory.isLeftSlot(rawSlot)
-                                   : TradeInventory.isRightSlot(rawSlot);
+        boolean inMySlots = session.ownsSlot(isLeft, rawSlot);
         int myStatus = isLeft ? TradeInventory.LEFT_STATUS_SLOT : TradeInventory.RIGHT_STATUS_SLOT;
         int myXp     = isLeft ? TradeInventory.LEFT_XP_SLOT     : TradeInventory.RIGHT_XP_SLOT;
 
@@ -131,8 +130,7 @@ public class TradeInventoryListener implements Listener {
         // If any dragged slot is in the top inv but not in the player's own zone — cancel
         for (int rawSlot : e.getRawSlots()) {
             if (rawSlot >= 54) continue; // player's own inventory row
-            boolean ownSlot = isLeft ? TradeInventory.isLeftSlot(rawSlot)
-                                     : TradeInventory.isRightSlot(rawSlot);
+            boolean ownSlot = session.ownsSlot(isLeft, rawSlot);
             if (!ownSlot) {
                 e.setCancelled(true);
                 return;
@@ -202,7 +200,7 @@ public class TradeInventoryListener implements Listener {
         // Лимит стаков уже выбран — докидывать нечего
         if (tradeManager.rejectShiftClickOverLimit(session, isLeft, player)) return;
 
-        int[] ownSlots = isLeft ? TradeInventory.LEFT_ITEM_SLOTS : TradeInventory.RIGHT_ITEM_SLOTS;
+        int[] ownSlots = session.getSlotsOf(isLeft);
         Inventory inv  = session.getInventory();
 
         // First pass: try to stack onto existing similar items

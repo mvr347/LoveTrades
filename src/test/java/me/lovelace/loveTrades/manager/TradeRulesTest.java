@@ -66,4 +66,20 @@ class TradeRulesTest {
         assertEquals(4, TradeRules.xpOfferCap(4, 10));
         assertEquals(0, TradeRules.xpOfferCap(-2, 10));
     }
+
+    @org.junit.jupiter.api.Test
+    void tradeSlotsFollowPolitenessTable() {
+        int[] expected = {1, 2, 3, 4, 6, 8, 9};
+        for (int level = 0; level <= 6; level++) {
+            org.junit.jupiter.api.Assertions.assertEquals(expected[level],
+                TradeRules.tradeSlots(level, null, 16), "level " + level);
+        }
+    }
+
+    @org.junit.jupiter.api.Test
+    void tradeSlotsAreClamped() {
+        org.junit.jupiter.api.Assertions.assertEquals(9, TradeRules.tradeSlots(99, null, 16));
+        org.junit.jupiter.api.Assertions.assertEquals(1, TradeRules.tradeSlots(-5, null, 16));
+        org.junit.jupiter.api.Assertions.assertEquals(4, TradeRules.tradeSlots(3, new int[]{9, 9, 9, 40}, 4));
+    }
 }

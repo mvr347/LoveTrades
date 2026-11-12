@@ -34,4 +34,18 @@ public final class TradeRules {
         int cap = Math.max(0, available);
         return maxPerSide > 0 ? Math.min(cap, maxPerSide) : cap;
     }
+
+    /** Default tradable slots per side by politeness step 0..6 (Изгой .. Идеально); Нейтральный (3) = 4. */
+    public static final int[] DEFAULT_SLOTS_BY_POLITENESS = {1, 2, 3, 4, 6, 8, 9};
+
+    /**
+     * How many item slots a side may use at the given politeness step. {@code table} holds one entry per step 0..6;
+     * a missing or short table falls back to the defaults, and a step outside the table is clamped to its ends.
+     * The result is never below 1 and never above {@code zoneSize}.
+     */
+    public static int tradeSlots(int politenessLevel, int[] table, int zoneSize) {
+        int[] t = (table == null || table.length == 0) ? DEFAULT_SLOTS_BY_POLITENESS : table;
+        int idx = Math.max(0, Math.min(t.length - 1, politenessLevel));
+        return Math.max(1, Math.min(zoneSize, t[idx]));
+    }
 }

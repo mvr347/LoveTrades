@@ -183,6 +183,14 @@ public class TradeManager {
         activeSessions.put(left.getUniqueId(),  session);
         activeSessions.put(right.getUniqueId(), session);
 
+        int[] table = config.getTradeSlotsByPoliteness();
+        int leftCount  = TradeRules.tradeSlots(politenessLevel(left),  table, TradeInventory.LEFT_ITEM_SLOTS.length);
+        int rightCount = TradeRules.tradeSlots(politenessLevel(right), table, TradeInventory.RIGHT_ITEM_SLOTS.length);
+        session.setSlots(TradeInventory.unlocked(TradeInventory.LEFT_ITEM_SLOTS, leftCount),
+                         TradeInventory.unlocked(TradeInventory.RIGHT_ITEM_SLOTS, rightCount));
+        TradeInventory.fillLockedSlots(inv, TradeInventory.LEFT_ITEM_SLOTS, leftCount);
+        TradeInventory.fillLockedSlots(inv, TradeInventory.RIGHT_ITEM_SLOTS, rightCount);
+
         TradeInventory.configureXp(config.getMaxXpLevelsPerSide(), config.getXpShiftStep());
         TradeInventory.initLayout(inv, session, left, right, modifiers, config.getClanAllyBonus());
 
@@ -199,7 +207,7 @@ public class TradeManager {
         boolean nowReady = !session.isReadyOf(isLeft);
 
         // Подтвердить готовность можно только уложившись в лимит стаков
-        if (nowReady && restrictions.exceedsStackLimit(player, session.getInventory(), itemSlotsOf(isLeft))) {
+        if (nowReady && restrictions.exceedsStackLimit(player, session.getInventory(), itemSlotsOf(session, isLeft))) {
             sendStackLimitMessage(player, session, isLeft);
             return;
         }
@@ -288,14 +296,14 @@ public class TradeManager {
 
         // Финальная проверка лимита: предложение могло измениться после подтверждения
         // готовности (например, через drag, не прошедший проверку при клике).
-        if (restrictions.exceedsStackLimit(left,  inv, TradeInventory.LEFT_ITEM_SLOTS)
-            || restrictions.exceedsStackLimit(right, inv, TradeInventory.RIGHT_ITEM_SLOTS)) {
+        if (restrictions.exceedsStackLimit(left,  inv, session.getSlotsOf(true))
+            || restrictions.exceedsStackLimit(right, inv, session.getSlotsOf(false))) {
             cancelTrade(session, TradeCancelEvent.Reason.STACK_LIMIT);
             return;
         }
 
-        List<ItemStack> leftOffer  = collectSlots(inv, TradeInventory.LEFT_ITEM_SLOTS);
-        List<ItemStack> rightOffer = collectSlots(inv, TradeInventory.RIGHT_ITEM_SLOTS);
+        List<ItemStack> leftOffer  = collectSlots(inv, session.getSlotsOf(true));
+        List<ItemStack> rightOffer = collectSlots(inv, session.getSlotsOf(false));
 
         // Clan ally bonus modifier (negative = discount for both receivers)
         double allyMod = session.isAllyBonus() ? config.getClanAllyBonus() : 0.0;
@@ -436,8 +444,8 @@ public class TradeManager {
 
         closeInventoriesProgrammatically(session, left, right);
 
-        List<ItemStack> leftItems  = collectSlots(session.getInventory(), TradeInventory.LEFT_ITEM_SLOTS);
-        List<ItemStack> rightItems = collectSlots(session.getInventory(), TradeInventory.RIGHT_ITEM_SLOTS);
+        List<ItemStack> leftItems  = collectSlots(session.getInventory(), session.getSlotsOf(true));
+        List<ItemStack> rightItems = collectSlots(session.getInventory(), session.getSlotsOf(false));
 
         // Return synchronously: a deferred task would run after the player quit/was kicked
         // and the items would be lost. Offline owners get their items persisted instead.
@@ -563,7 +571,7 @@ public class TradeManager {
         if (player == null) return;
 
         UUID uuid = player.getUniqueId();
-        boolean over = restrictions.exceedsStackLimit(player, session.getInventory(), itemSlotsOf(isLeft));
+        boolean over = restrictions.exceedsStackLimit(player, session.getInventory(), itemSlotsOf(session, isLeft));
         boolean wasOver = Boolean.TRUE.equals(stackLimitWarned.get(uuid));
 
         if (over && !wasOver) {
@@ -577,7 +585,7 @@ public class TradeManager {
     private void sendStackLimitMessage(Player player, TradeSession session, boolean isLeft) {
         int limit = restrictions.effectiveStackLimit(player);
         if (limit <= 0) return;
-        int current = restrictions.countStacks(session.getInventory(), itemSlotsOf(isLeft));
+        int current = restrictions.countStacks(session.getInventory(), itemSlotsOf(session, isLeft));
         player.sendMessage(msg("stack-limit-exceeded", Map.of(
             "{max}",     String.valueOf(limit),
             "{current}", String.valueOf(current))));
@@ -590,7 +598,7 @@ public class TradeManager {
     public boolean rejectShiftClickOverLimit(TradeSession session, boolean isLeft, Player player) {
         int limit = restrictions.effectiveStackLimit(player);
         if (limit <= 0) return false;
-        if (restrictions.countStacks(session.getInventory(), itemSlotsOf(isLeft)) < limit) return false;
+        if (restrictions.countStacks(session.getInventory(), itemSlotsOf(session, isLeft)) < limit) return false;
 
         sendStackLimitMessage(player, session, isLeft);
         return true;
@@ -603,8 +611,15 @@ public class TradeManager {
         return clan != null && clan.isEnemy(a, b);
     }
 
-    private static int[] itemSlotsOf(boolean isLeft) {
-        return isLeft ? TradeInventory.LEFT_ITEM_SLOTS : TradeInventory.RIGHT_ITEM_SLOTS;
+    private static int[] itemSlotsOf(TradeSession session, boolean isLeft) {
+        return session.getSlotsOf(isLeft);
+    }
+
+    /** Politeness step 0..6 from LoveBehavior (via LoveCore); neutral when it is not installed. */
+    private static int politenessLevel(Player player) {
+        return dev.lovelace.lovecore.api.LoveCore.service(dev.lovelace.lovecore.api.social.BehaviorLevels.class)
+                .map(levels -> levels.politenessLevel(player.getUniqueId()))
+                .orElse(3);
     }
 
     /**

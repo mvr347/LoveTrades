@@ -11,6 +11,10 @@ public class TradeSession {
     private final UUID playerRight;
     private final Inventory inventory;
 
+    // Item slots each side may use (politeness-limited prefix of the full zone); set at trade start
+    private int[] leftSlots = me.lovelace.loveTrades.gui.TradeInventory.LEFT_ITEM_SLOTS;
+    private int[] rightSlots = me.lovelace.loveTrades.gui.TradeInventory.RIGHT_ITEM_SLOTS;
+
     private int xpLeft = 0;
     private int xpRight = 0;
     private boolean readyLeft = false;
@@ -57,6 +61,16 @@ public class TradeSession {
     public UUID getPlayerLeft() { return playerLeft; }
     public UUID getPlayerRight() { return playerRight; }
     public Inventory getInventory() { return inventory; }
+
+    public int[] getSlotsOf(boolean left) { return left ? leftSlots : rightSlots; }
+    public void setSlots(int[] leftSlots, int[] rightSlots) {
+        this.leftSlots = leftSlots;
+        this.rightSlots = rightSlots;
+    }
+    public boolean ownsSlot(boolean left, int rawSlot) {
+        for (int s : getSlotsOf(left)) if (s == rawSlot) return true;
+        return false;
+    }
 
     public int getXpLeft() { return xpLeft; }
     public void setXpLeft(int xp) { this.xpLeft = xp; }
