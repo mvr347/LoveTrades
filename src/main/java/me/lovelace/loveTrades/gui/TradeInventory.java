@@ -210,7 +210,7 @@ public final class TradeInventory {
         rightLore.add("&7Налог получателя: &c" + String.format("%.1f%%", leftTax));
         if (session.isAllyBonus()) rightLore.add(String.format("&6Союз: &a%.1f%% &6к налогу", allyBonusPercent));
 
-        ItemStack rightInfo = makeInfoBook("&6Предложение партнёра", rightLore);
+        ItemStack rightInfo = TradeHeads.head(TradeHeads.INFO_PARTNER, "&6Предложение партнёра", rightLore);
         for (int s : RIGHT_INFO_SLOTS) inv.setItem(s, rightInfo);
     }
 
