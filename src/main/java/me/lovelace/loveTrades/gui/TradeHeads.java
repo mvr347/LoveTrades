@@ -30,6 +30,8 @@ public final class TradeHeads {
     public static final String CANCEL = "cancel";
     public static final String XP = "xp";
     public static final String INFO = "info";
+    /** The partner's offer has its own head (owner texture 2026-11-12); "info" stays on your own offer. */
+    public static final String INFO_PARTNER = "info-partner";
 
     /** Texture hashes already used by the other Love* menus (LoveDuels ready/not-ready, LoveClans barrier/experience/info). */
     public static final Map<String, String> DEFAULT_HASHES = defaults();
@@ -45,7 +47,8 @@ public final class TradeHeads {
         m.put(NOT_READY, "5a6787ba32564e7c2f3a0ce64498ecbb23b89845e5a66b5cec7736f729ed37");
         m.put(CANCEL, "afd2400002ad9fbbbd0066941eb5b1a384ab9b0e48a178ee96e4d129a5208654");
         m.put(XP, "48b81d8935fc101e35f3e54f537b612822f18faf752a90037cc4215a5dc881ef");
-        m.put(INFO, "4cb3acdc11ca747bf710e59f4c8e9b3d949fdd364c6869831ca878f0763d1787");
+        m.put(INFO, "f80d3295d3d9abd62776abcb8da756f298a545fee9498c4f69a1c2c78524c824");
+        m.put(INFO_PARTNER, "4cb3acdc11ca747bf710e59f4c8e9b3d949fdd364c6869831ca878f0763d1787");
         return java.util.Collections.unmodifiableMap(m);
     }
 

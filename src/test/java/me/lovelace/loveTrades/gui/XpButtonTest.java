@@ -66,7 +66,7 @@ class XpButtonTest {
             assertTrue(m.find(), json);
             assertEquals(entry.getValue(), m.group(1));
         }
-        assertEquals(5, TradeHeads.DEFAULT_HASHES.size());
+        assertEquals(6, TradeHeads.DEFAULT_HASHES.size());
     }
 
     @org.junit.jupiter.api.Test
