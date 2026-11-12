@@ -54,6 +54,22 @@ public final class TradeInventory {
         xpShiftStep = Math.max(1, shiftStep);
     }
 
+    /** The first {@code count} slots of an item zone (zone order is row by row, so the top rows unlock first). */
+    public static int[] unlocked(int[] zone, int count) {
+        return Arrays.copyOf(zone, Math.max(0, Math.min(zone.length, count)));
+    }
+
+    /** Fills the item slots a side has not unlocked yet with a pane that says why. */
+    public static void fillLockedSlots(Inventory inv, int[] zone, int unlockedCount) {
+        ItemStack lock = makePane(Material.GRAY_STAINED_GLASS_PANE, "&8Слот закрыт");
+        ItemMeta meta = lock.getItemMeta();
+        meta.lore(List.of(
+            legacy("&7Слоты открываются с ростом вежливости:"),
+            legacy("&7сейчас доступно &f" + unlockedCount + " &7из &f" + zone.length)));
+        lock.setItemMeta(meta);
+        for (int i = unlockedCount; i < zone.length; i++) inv.setItem(zone[i], lock.clone());
+    }
+
     public static Inventory createInventory(Player left, Player right) {
         Component title = Component.text(left.getName(), NamedTextColor.GOLD)
             .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
@@ -130,8 +146,15 @@ public final class TradeInventory {
     public static void updateXpSlot(Inventory inv, boolean isLeft, int amount, int available) {
         int slot = isLeft ? LEFT_XP_SLOT : RIGHT_XP_SLOT;
         int cap = me.lovelace.loveTrades.manager.TradeRules.xpOfferCap(available, xpMaxPerSide);
-        inv.setItem(slot, TradeHeads.head(TradeHeads.XP, "&6Опыт: &f" + amount + " ур.",
-            xpLore(amount, available, cap, xpShiftStep)));
+        ItemStack xp = TradeHeads.head(TradeHeads.XP, "&6Опыт: &f" + amount + " ур.",
+            xpLore(amount, available, cap, xpShiftStep));
+        xp.setAmount(xpStackAmount(amount));
+        inv.setItem(slot, xp);
+    }
+
+    /** Stack size of the XP button: one per offered level, so +1 level shows as +1 on the button (1..64). */
+    public static int xpStackAmount(int levels) {
+        return Math.max(1, Math.min(64, levels));
     }
 
     /** Lore of the XP button; separate and pure so the layout can be tested without a server. */
@@ -167,8 +190,8 @@ public final class TradeInventory {
         double leftTax  = left  != null ? ModifierManager.clampRate(mods.getEffectiveTax(left,  allyMod)) : 0.0;
         double rightTax = right != null ? ModifierManager.clampRate(mods.getEffectiveTax(right, allyMod)) : 0.0;
 
-        int leftCount  = countItems(inv, LEFT_ITEM_SLOTS);
-        int rightCount = countItems(inv, RIGHT_ITEM_SLOTS);
+        int leftCount  = countItems(inv, session.getSlotsOf(true));
+        int rightCount = countItems(inv, session.getSlotsOf(false));
 
         List<String> leftLore = new ArrayList<>();
         leftLore.add("&7Предметов: &f" + leftCount + " ед.");
